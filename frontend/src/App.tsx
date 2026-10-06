@@ -22,7 +22,8 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopBar tick={last} state={state} connected={connected} />
+      <TopBar tick={last} state={state} connected={connected}
+        historyMinutes={ticks.length ? last.minute - ticks[0].minute : 0} />
 
       <main className="main">
         <section className="crew">
