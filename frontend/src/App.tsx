@@ -1,16 +1,19 @@
 import { useState } from 'react'
-import { AlertFeed } from './components/AlertFeed'
+import { AlertFeed, type AckMap } from './components/AlertFeed'
 import { ControlPanel } from './components/ControlPanel'
 import { CrewBanner } from './components/CrewBanner'
 import { CrewGrid, useStableRiskOrder } from './components/CrewGrid'
 import { TopBar } from './components/TopBar'
 import { WorkerCard } from './components/WorkerCard'
 import { WorkerDetail } from './components/WorkerDetail'
-import { useGateway } from './useGateway'
+import { control, useGateway } from './useGateway'
 
 export default function App() {
   const { state, ticks, alerts, connected } = useGateway()
   const [selected, setSelected] = useState<string | null>(null)
+  const [acks, setAcks] = useState<AckMap>({})
+  const acknowledge = (workerId: string, ts: string) => setAcks((a) => ({ ...a, [workerId]: ts }))
+  const sendToRest = (workerId: string) => control({ action: 'rest', worker_id: workerId })
   const last = ticks[ticks.length - 1]
   const workers = last?.workers ?? []
   const selectedWorker = workers.find((w) => w.worker_id === selected)
@@ -38,7 +41,8 @@ export default function App() {
           )}
         </section>
 
-        <AlertFeed alerts={alerts} profiles={state?.profiles ?? []} onSelect={setSelected} />
+        <AlertFeed alerts={alerts} workers={workers} acks={acks} onAck={acknowledge}
+          onRest={sendToRest} onSelect={setSelected} />
       </main>
 
       {state && <ControlPanel state={state} selectedId={selected} />}
