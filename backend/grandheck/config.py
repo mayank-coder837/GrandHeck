@@ -167,6 +167,14 @@ FORECAST_MIN_POINTS = 12            # DESIGN: need this many points before forec
 FORECAST_HORIZON_MIN = 120          # DESIGN: beyond this we report "> 120 min"
 FORECAST_MIN_CORE_SLOPE_C_PER_H = 0.1   # DESIGN: flatter than this = "not rising"
 FORECAST_MIN_PSI_SLOPE_PER_H = 0.5      # DESIGN: same, for PSI
+FORECASTER_VERSION = "v2"           # DESIGN: "v1" = trend extrapolation only;
+                                    # "v2" = ridge model on ECTemp + environment + profile
+                                    # (pipeline/model.py), falls back to v1 if no model file.
+V2_RIDGE_ALPHA = 10.0               # DESIGN: ridge regularisation strength
+V2_RISK_Z = 1.0                     # DESIGN: v2 warns on risk, not on the average forecast:
+                                    # crossing = predicted core + Z x (validation error at
+                                    # that horizon) >= limit. Z = 1 ~ a 1-in-6 chance.
+                                    # Tuned on validation seeds only (eval/evaluate.py --tuning).
 
 # Alert explanations. DESIGN: these only rank and phrase the "why" factors
 # shown with an alert; they never decide whether an alert fires.

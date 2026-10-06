@@ -30,7 +30,8 @@ from ..science.psi import psi as compute_psi
 from ..science.psi import psi_band
 from ..science.wbgt import estimate_wbgt
 from .alerts import AlertInputs, AlertStateMachine
-from .forecaster import Forecast, ReasonInputs, explain, forecast
+from .forecaster import Forecast, ReasonInputs, combine_with_model, explain, forecast
+from .model import RidgeModel, feature_vector, time_to_limit
 
 
 def _trend_per_hour(points: list[tuple[float, float]], window_min: float) -> float | None:
@@ -101,6 +102,8 @@ class WorkerState:
         self.minutes_since_rest = 0
         self.exposure_total_min = 0
         self.exposure_continuous_min = 0
+        self.observed_minutes = 0
+        self.features = None                # last v2 feature vector (also used for training)
         self.forecast: Forecast | None = None
         self.reasons: list[str] = []
         self.history: deque = deque(maxlen=C.HISTORY_MINUTES)
@@ -134,6 +137,7 @@ class WorkerState:
     def update(self, minute: float, vitals: VitalsReading | None, wbgt_c: float | None) -> None:
         observed = vitals is not None and vitals.hr_bpm is not None
         if observed:
+            self.observed_minutes += 1
             self.filter.update(vitals.hr_bpm)
             self.hr = vitals.hr_bpm
             self.psi = compute_psi(self.filter.ct, self.hr, self.tc0, self._baseline_hr(self.hr))
@@ -171,8 +175,12 @@ class WorkerState:
 
 class Gateway:
     def __init__(self, profiles: list[WorkerProfile], bus: Bus, site_id: str = C.SITE_ID,
-                 lat: float = C.SITE_LAT_DEG, lon: float = C.SITE_LON_DEG) -> None:
+                 lat: float = C.SITE_LAT_DEG, lon: float = C.SITE_LON_DEG,
+                 forecaster: str = C.FORECASTER_VERSION, risk_z: float = C.V2_RISK_Z) -> None:
         self.site_id = site_id
+        self.risk_z = risk_z
+        self.model = RidgeModel.load() if forecaster == "v2" else None
+        self.forecaster_version = "v2" if self.model is not None else "v1"
         self.bus = bus
         self.lat, self.lon = lat, lon
         self.site = SiteState()
@@ -224,9 +232,20 @@ class Gateway:
         for wid, ws in self.workers.items():
             ws.update(minute, self._pending_vitals.pop(wid, None), self.site.wbgt_c)
             hist = list(ws.history)
-            ws.forecast = forecast([h["minute"] for h in hist], [h["core_c"] for h in hist],
-                                   [h["psi"] for h in hist], ws.core_limit_c)
-            fc = ws.forecast
+            fc = forecast([h["minute"] for h in hist], [h["core_c"] for h in hist],
+                          [h["psi"] for h in hist], ws.core_limit_c)
+            ws.features = feature_vector(
+                core_est=ws.filter.ct, core_slope_c_per_h=fc.core_slope_c_per_h, hr=ws.hr,
+                hr_rise_15=ws.hr_rise_15min(), psi=ws.psi,
+                wbgt_excess=None if self.site.wbgt_c is None else self.site.wbgt_c - ws.wbgt_limit_c,
+                wbgt_trend_c_per_h=site["wbgt_trend_c_per_h"], working=not ws.resting,
+                minutes_since_rest=ws.minutes_since_rest, acclimatized=ws.p.acclimatized,
+                workload=ws.p.workload, older=ws.older, data_minutes=ws.observed_minutes)
+            if self.model is not None and not fc.stale and not ws.signal_lost:
+                path = self.model.predict_path(ws.features, ws.filter.ct)
+                risk = self.model.risk_path(path, self.risk_z)
+                fc = combine_with_model(fc, path, ws.core_limit_c, time_to_limit(risk, ws.core_limit_c))
+            ws.forecast = fc
             at_threshold = (not ws.signal_lost) and (
                 ws.filter.ct >= ws.core_limit_c or (ws.psi is not None and ws.psi >= C.PSI_CRITICAL))
             extra = C.ALERT_OLDER_WORKER_EXTRA_MIN if ws.older else 0.0

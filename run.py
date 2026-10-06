@@ -73,7 +73,8 @@ def ensure_frontend_built() -> None:
 
 
 def in_venv(*args: str) -> int:
-    return subprocess.call([str(VENV_PY), *args], cwd=BACKEND)
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    return subprocess.call([str(VENV_PY), *args], cwd=BACKEND, env=env)
 
 
 def main() -> None:

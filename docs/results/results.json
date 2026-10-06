@@ -1,0 +1,70 @@
+{
+  "n_shifts": 200,
+  "n_worker_shifts": 1600,
+  "n_events": 485,
+  "actionable_window_min": 60,
+  "wbgt_fixed_threshold_c": 28.2,
+  "ectemp_rmse_c": 0.23597430784529896,
+  "systems": {
+    "ours": {
+      "label": "GrandHeck v2 (Warning or higher)",
+      "detected": 392,
+      "detection_rate": 0.8082474226804124,
+      "median_lead_min": 39.0,
+      "mean_lead_min": 37.16326530612245,
+      "missed": 93,
+      "false_alarms": 720,
+      "false_alarms_per_100_worker_shifts": 45.0,
+      "precision": 0.3803786574870912,
+      "quiet_workers_alarmed_pct": 12.73542600896861
+    },
+    "ours_advisory": {
+      "label": "GrandHeck v2 (Advisory or higher)",
+      "detected": 468,
+      "detection_rate": 0.9649484536082474,
+      "median_lead_min": 55.0,
+      "mean_lead_min": 45.06410256410256,
+      "missed": 17,
+      "false_alarms": 2552,
+      "false_alarms_per_100_worker_shifts": 159.5,
+      "precision": 0.14333669016448472,
+      "quiet_workers_alarmed_pct": 40.35874439461883
+    },
+    "ours_v1": {
+      "label": "GrandHeck v1, trend only (Warning or higher)",
+      "detected": 319,
+      "detection_rate": 0.6577319587628866,
+      "median_lead_min": 52,
+      "mean_lead_min": 38.912225705329156,
+      "missed": 166,
+      "false_alarms": 782,
+      "false_alarms_per_100_worker_shifts": 48.875,
+      "precision": 0.3170305676855895,
+      "quiet_workers_alarmed_pct": 14.61883408071749
+    },
+    "wbgt": {
+      "label": "Naive WBGT alarm (\u2265 28.2 \u00b0C)",
+      "detected": 402,
+      "detection_rate": 0.8288659793814434,
+      "median_lead_min": 60.0,
+      "mean_lead_min": 53.223880597014926,
+      "missed": 83,
+      "false_alarms": 4513,
+      "false_alarms_per_100_worker_shifts": 282.0625,
+      "precision": 0.056252613969050604,
+      "quiet_workers_alarmed_pct": 100.0
+    },
+    "hr": {
+      "label": "Naive heart-rate alarm (> 180 \u2212 age, sustained)",
+      "detected": 91,
+      "detection_rate": 0.18762886597938144,
+      "median_lead_min": 57,
+      "mean_lead_min": 42.86813186813187,
+      "missed": 394,
+      "false_alarms": 1064,
+      "false_alarms_per_100_worker_shifts": 66.5,
+      "precision": 0.09983079526226735,
+      "quiet_workers_alarmed_pct": 14.52914798206278
+    }
+  }
+}

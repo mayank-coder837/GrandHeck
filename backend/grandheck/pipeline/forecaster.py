@@ -78,6 +78,26 @@ def forecast(times_min: list[float], core_c: list[float | None], psi: list[float
     return Forecast(ttc, driver, core_slope * 60.0, psi_slope * 60.0, stale=False, core_line=line)
 
 
+def combine_with_model(v1: Forecast, path: list[tuple[int, float]], core_limit_c: float,
+                       ttc_core_model: float | None) -> Forecast:
+    """
+    v2: the model's predicted core path replaces straight-line extrapolation for
+    the core-temperature crossing within its 60-min reach. Beyond that reach we
+    keep v1's longer-range estimate; the PSI crossing still comes from v1.
+    """
+    if v1.stale:
+        return v1
+    reach = path[-1][0]
+    ttc_core = ttc_core_model
+    if ttc_core is None and v1.driver == "core" and v1.ttc_min is not None and v1.ttc_min > reach:
+        ttc_core = v1.ttc_min
+    ttc_psi = v1.ttc_min if v1.driver == "psi" else None
+    candidates = [(v, n) for v, n in ((ttc_core, "core"), (ttc_psi, "psi")) if v is not None]
+    ttc, driver = min(candidates) if candidates else (None, None)
+    line = [(float(h), float(v)) for h, v in path]
+    return Forecast(ttc, driver, v1.core_slope_c_per_h, v1.psi_slope_per_h, stale=False, core_line=line)
+
+
 @dataclass
 class ReasonInputs:
     core_c: float
