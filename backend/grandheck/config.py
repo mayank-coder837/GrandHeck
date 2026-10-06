@@ -244,6 +244,19 @@ SIM_WARMUP_MIN = 15                 # DESIGN: on a new shift the demo pre-simula
                                     # so the dashboard opens with forecasts, not "calibrating"
 WBGT_TREND_MIN_HISTORY_MIN = 15     # DESIGN: the reported WBGT trend needs this much history
 
+# Supervisor-directed rest in the demo (DESIGN; simulation and demo behaviour only,
+# the gateway's detection and alerting never use these)
+DIRECTED_REST_MIN = 20              # a directed rest lasts at least this long
+DIRECTED_REST_LOCATION = "cooled"   # "cooled" shelter or "shade"
+AUTO_REST_ON_ACK = True             # demo: acknowledging a Critical sends the worker to rest ...
+AUTO_REST_DELAY_MIN = 3             # ... this many minutes later (walking to the shelter)
+REST_UNTIL_CLEAR_TRIGGER_C = 0.0    # sent to rest with estimated core >= limit + this:
+                                    # hold the rest until both release criteria below are met
+REST_RELEASE_CORE_MARGIN_C = 0.2    # release only when estimated core < limit - this
+REST_RELEASE_HR_MARGIN_BPM = 20     # ... and heart rate < resting HR + this
+                                    # TODO(verify): return-to-work criteria with an occupational
+                                    # health source; these are demo values, not clinical ones.
+
 
 def todo_items() -> list[str]:
     """Return every line in this file marked TODO(verify)."""

@@ -1,6 +1,6 @@
 import {
   calibrationProgress, formatDuration, isOverLimit, isRecovering, lastSeenClock, overLimitSince,
-  personalReasons, riskTags,
+  personalReasons, REST_PLACE, restCondition, riskTags,
 } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
 import type { Tick, WorkerSnapshot } from '../types'
@@ -25,7 +25,11 @@ export function CountdownSlot({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }
     tone = 'recovering'
     main = 'Recovering'
     const s = w.core_slope_c_per_h
-    sub = s == null ? 'resting' : `resting · ${s <= 0 ? '↓' : '↑'} ${Math.abs(s).toFixed(1)} °C/h`
+    const r = w.directed_rest
+    const trend = s == null ? '' : ` · ${s <= 0 ? '↓' : '↑'} ${Math.abs(s).toFixed(1)} °C/h`
+    sub = r?.until_clear
+      ? `${REST_PLACE[r.location]} · ${restCondition(r)}`
+      : `${r ? REST_PLACE[r.location] : 'resting'}${trend}`
   } else if (isOverLimit(w)) {
     tone = 'alarm'
     main = 'Over limit'
@@ -68,12 +72,15 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
   const recovering = isRecovering(w)
   const tags = riskTags(w)
   // One personal reason, not repeating what the tags already say.
-  const reason = w.level !== 'NONE' && !w.signal_lost
+  const heading = w.pending_rest_min != null
+    ? `Heading to rest in ${Math.max(0, w.pending_rest_min)} min`
+    : undefined
+  const reason = heading ?? (w.level !== 'NONE' && !w.signal_lost
     ? personalReasons(w).find(
         (r) => !(r.startsWith('Not yet acclimatized') && tags.includes('Not acclimatized'))
           && !(r.startsWith('Age 45+') && tags.includes('Age 45+')),
       )
-    : undefined
+    : undefined)
   const state = w.signal_lost ? 'lost' : recovering ? 'recovering' : `level-${w.level}`
   const pulse = w.level === 'CRITICAL' && !recovering && !w.signal_lost
 

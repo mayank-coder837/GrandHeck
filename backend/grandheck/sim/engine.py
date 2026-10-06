@@ -92,6 +92,19 @@ class Simulator:
         w.workload = w.profile.workload
         w.forced_rest_until = self.minute + minutes
 
+    def start_directed_rest(self, worker_id: str, location: str = "shade") -> None:
+        """Supervisor pulls the worker off work until end_directed_rest() is called."""
+        w = self.workers[worker_id]
+        w.no_rest = False
+        w.workload = w.profile.workload
+        w.directed_rest = True
+        w.rest_location = location
+
+    def end_directed_rest(self, worker_id: str) -> None:
+        w = self.workers[worker_id]
+        w.directed_rest = False
+        w.forced_rest_until = -1
+
     # --- stepping -------------------------------------------------------------------
     def step(self) -> SimStep:
         now = self.now

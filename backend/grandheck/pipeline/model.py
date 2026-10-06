@@ -84,6 +84,17 @@ def feature_vector(*, core_est: float, core_slope_c_per_h: float | None, hr: flo
     ], dtype=float)
 
 
+def smooth_over_horizons(values: np.ndarray) -> np.ndarray:
+    """
+    Each horizon has its own linear model, so neighbouring predictions can
+    disagree and the path zigzags. A least-squares quadratic through the six
+    points keeps the overall shape (rising, falling, or one bend) and removes
+    the zigzag.
+    """
+    h = np.array(HORIZONS_MIN, dtype=float)
+    return np.polyval(np.polyfit(h, values, 2), h)
+
+
 @dataclass
 class RidgeModel:
     mean: np.ndarray
@@ -94,7 +105,7 @@ class RidgeModel:
 
     def predict_path(self, x: np.ndarray, core_est: float) -> list[tuple[int, float]]:
         z = (x - self.mean) / self.scale
-        residual = self.coef @ z + self.intercept
+        residual = smooth_over_horizons(self.coef @ z + self.intercept)
         return [(h, core_est + float(r)) for h, r in zip(HORIZONS_MIN, residual)]
 
     def risk_path(self, path: list[tuple[int, float]], z: float) -> list[tuple[int, float]]:

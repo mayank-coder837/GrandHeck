@@ -3,7 +3,7 @@ import {
   Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { actionHeadline, isRecovering, orderedReasons, riskTags } from '../derive'
+import { actionHeadline, isRecovering, orderedReasons, REST_PLACE, riskTags } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
 import type { Alert, Tick, WorkerSnapshot } from '../types'
 import { axisTick, crossing, domainWithPadding, makeClock, rollingMean } from '../chartUtils'
@@ -181,6 +181,15 @@ export function WorkerDetail({
               </button>
             </div>
             {protocol && <p className="protocol">{latest.action}</p>}
+            {worker.directed_rest && (
+              <p className="protocol">
+                Resting in {REST_PLACE[worker.directed_rest.location]}{' '}
+                {worker.directed_rest.until_clear
+                  ? `until core < ${worker.directed_rest.core_below_c.toFixed(1)} °C and heart rate < ${Math.round(worker.directed_rest.hr_below_bpm)} bpm`
+                  : 'for at least 20 min'}
+                {' '}· {worker.directed_rest.elapsed_min} min so far
+              </p>
+            )}
           </div>
         ) : (
           <div className="focus-action calm">No action needed. Keep the normal work–rest schedule and hydration.</div>

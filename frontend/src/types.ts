@@ -21,6 +21,14 @@ export interface HistoryPoint {
   wbgt_c: number | null
 }
 
+export interface DirectedRest {
+  location: 'cooled' | 'shade'
+  until_clear: boolean          // held until core and heart rate recover
+  core_below_c: number
+  hr_below_bpm: number
+  elapsed_min: number
+}
+
 export interface WorkerSnapshot {
   worker_id: string
   profile: Profile
@@ -49,6 +57,9 @@ export interface WorkerSnapshot {
   risk_line: [number, number][]
   reasons: string[]
   point: HistoryPoint
+  // Added on the client from the tick's rest fields (demo / supervisor actions):
+  directed_rest?: DirectedRest | null
+  pending_rest_min?: number | null
 }
 
 export interface SiteSnapshot {
@@ -85,6 +96,8 @@ export interface Tick {
   workers: WorkerSnapshot[]
   alerts: Alert[]
   truth: Record<string, { core_c: number; working: boolean }>
+  rest?: Record<string, DirectedRest>
+  pending_rest?: Record<string, number>
 }
 
 export interface RunState {
@@ -96,6 +109,9 @@ export interface RunState {
   paused: boolean
   finished: boolean
   forecaster: 'v1' | 'v2'
+  rest_location: 'cooled' | 'shade'
+  auto_rest_on_ack: boolean
+  auto_rest_delay_min: number
   profiles: Profile[]
   site: { id: string; name: string; lat: number; lon: number; utc_offset_h: number }
   thresholds: {

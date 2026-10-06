@@ -44,6 +44,8 @@ FATIGUE_FULL_MIN = 120.0    # ... after 2 h of work without a rest
 SELF_STOP_TC = 39.6         # a worker this hot stops working by themselves
 HR_WORKLOAD_PER_W = 0.04    # bpm per W of metabolic rate relative to 300 W
 REST_SHADE = True           # breaks are taken in shade
+COOLED_SHELTER_WBGT_C = 22.0  # an air-conditioned rest shelter (simulation choice)
+TAU_COOLED_MIN = 15.0       # in a cooled shelter the body sheds heat faster than in shade
 
 
 @dataclass
@@ -82,6 +84,8 @@ class SimWorker:
         self.minutes_since_rest = 0
         self.no_rest = False            # "sudden spike" scenario
         self.forced_rest_until = -1     # minute index; set by "send to rest"
+        self.directed_rest = False      # supervisor-directed rest, held until released
+        self.rest_location = "shade"    # "shade" | "cooled" for directed rest
         self._burst = 0
         self.working = False
 
@@ -91,7 +95,7 @@ class SimWorker:
 
     # --- schedule -------------------------------------------------------------
     def scheduled_to_work(self, minute_of_day: int, minute_index: int) -> bool:
-        if minute_index < self.forced_rest_until:
+        if self.directed_rest or minute_index < self.forced_rest_until:
             return False
         if self.tc >= SELF_STOP_TC:
             return False
@@ -127,7 +131,12 @@ class SimWorker:
             self.minutes_since_rest = max(0, self.minutes_since_rest - 4)  # recovers 4x faster
 
         m = self._metabolic(self.working)
-        env = wbgt_sun if (self.working or not REST_SHADE) else wbgt_shade
+        if self.working or not REST_SHADE:
+            env = wbgt_sun
+        elif self.directed_rest and self.rest_location == "cooled":
+            env = COOLED_SHELTER_WBGT_C
+        else:
+            env = wbgt_shade
         tc_eq = TC_EQ_BASE + TC_EQ_PER_W * m + (0.1 if not self.profile.acclimatized else 0.0)
         fatigue = 1.0 + FATIGUE_GAIN * min(1.0, self.minutes_since_rest / FATIGUE_FULL_MIN)
         gain = K_HEAT_GAIN * self.t.heat_gain_mult
@@ -136,7 +145,8 @@ class SimWorker:
         if self.profile.age >= 45:
             gain *= 1.1
         excess = max(0.0, env - self._tolerance(m))
-        self.tc += (tc_eq - self.tc) / TAU_MIN + gain * excess * fatigue + self.rng.gauss(0, 0.005)
+        tau = TAU_COOLED_MIN if (not self.working and self.directed_rest and self.rest_location == "cooled") else TAU_MIN
+        self.tc += (tc_eq - self.tc) / tau + gain * excess * fatigue + self.rng.gauss(0, 0.005)
 
         # heart rate: lagged response toward target, AR noise, occasional exertion bursts
         target = self._hr_target(self.working, self.minutes_since_rest)

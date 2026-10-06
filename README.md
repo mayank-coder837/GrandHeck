@@ -6,7 +6,7 @@ Redline watches a crew of outdoor workers at a remote desert site. For **each wo
 
 ![Evaluation results](docs/results/results_chart.png)
 
-On 200 held-out simulated shifts (1,600 worker-shifts, 485 critical events), Redline warned before **94%** of critical heat-strain events, a median **50 minutes** ahead. It raised **5.6× fewer false alarms** than a fixed WBGT alarm (50 vs. 281 per 100 worker-shifts). [Details and caveats are below.](#evaluation-results)
+On 200 held-out simulated shifts (1,600 worker-shifts, 485 critical events), Redline warned before **94%** of critical heat-strain events, a median **50 minutes** ahead. It raised **5.4× fewer false alarms** than a fixed WBGT alarm (52 vs. 281 per 100 worker-shifts). [Details and caveats are below.](#evaluation-results)
 
 ---
 
@@ -109,6 +109,7 @@ The weather station sends air temperature, relative humidity, solar radiation an
 - **Output:** one linear model per horizon (0, 10, 20, 30, 45, 60 minutes). Each predicts the worker's true core temperature **if they keep working as they are now**.
 - **Why it's needed:** ECTemp is deliberately slow-moving. When core temperature climbs fast (a new worker on heavy work in strong heat), the estimate lags. v2 uses environment and profile inputs to anticipate the climb.
 - **Warns on risk, not the average.** Advisory and Warning fire when the *risk edge* (forecast + 0.5 × that horizon's validation error) reaches the danger line. **Critical** is reserved for the central forecast within 5 minutes, or the limit actually reached.
+- **Smoothed path.** Each horizon is a separate linear model, so neighbouring predictions can disagree. A least-squares quadratic through the six predictions removes the zigzag while keeping a real rise, fall, or single bend.
 - **Beyond 60 minutes,** the v1 straight-line trend extrapolation supplies the longer-range estimate. **v1** is kept as a fallback and as a comparison in the evaluation.
 
 **Alert tiers.** The thresholds below are design choices, not health thresholds.
@@ -263,6 +264,8 @@ Worker profiles (`WorkerProfile` in `schema.py`) hold: `worker_id`, `name`, `rol
 | **G** | Compare with true core temp (detail view) | **← →** / **Esc** | Previous / next worker, close detail |
 | **P** | Presentation mode (≈20% larger text) | **T** | Switch dark / light theme |
 
+**Rest in the demo.** *Send to rest* moves the worker to a cooled shelter (or shade; switch in the Demo drawer) for at least 20 minutes. If they were over their red line when sent, the rest is held until the dashboard shows they've recovered: estimated core temperature 0.2 °C below their limit **and** heart rate within 20 bpm of their resting rate. Those two numbers are demo values marked `TODO(verify)` in `config.py`, not clinical return-to-work criteria. With *auto-rest* on (default), acknowledging a Critical alert sends that worker to rest 3 minutes later.
+
 A new shift silently pre-simulates 15 minutes, so the dashboard opens with live countdowns instead of "calibrating".
 
 | Time | Do | What the audience sees / what you say |
@@ -275,7 +278,7 @@ A new shift silently pre-simulates 15 minutes, so the dashboard opens with live 
 | 1:35 | Click **Ravi Menon**, press **D**, then **Esc** | Ravi's card goes to hatched **NO SIGNAL · last seen …**, Action needed says "check on the worker in person", and the WBGT tile shows ⚠ (solar sensor offline, last reading held). "Missing data is shown, never treated as safe." |
 | 1:55 | **H**, then **4** (5×) | A humid sea breeze arrives and WBGT climbs. **Li Wei** (new electrician) is warned around 08:53, before his true crossing around 09:12; the older riggers follow later. "Same site, same heat, different people, different times." |
 | 2:30 | Point at **Action needed** | One entry per worker: a one-line action, **Send to rest**, **Acknowledge**, and the full protocol behind **Details**. |
-| 2:40 | Show `docs/results/results_chart.png` | "Over 200 simulated shifts we warned before 94% of critical events, a median 50 minutes ahead, with 5.6× fewer false alarms than a WBGT alarm. And it all runs offline on a box at the site." |
+| 2:40 | Show `docs/results/results_chart.png` | "Over 200 simulated shifts we warned before 94% of critical events, a median 50 minutes ahead, with 5.4× fewer false alarms than a WBGT alarm. And it all runs offline on a box at the site." |
 
 **Fallback:** press **N** to restart from a known state. **Space** pauses so you can talk; **+1 min** in the Demo drawer steps one minute at a time.
 
@@ -299,8 +302,8 @@ A new shift silently pre-simulates 15 minutes, so the dashboard opens with live 
 
 | System | Warned in time | Median lead (min) | Missed | False alarms / 100 worker-shifts | Alarm precision | Never-in-danger workers alarmed |
 |---|---|---|---|---|---|---|
-| **Redline v2 (Warning+)** | **456 / 485 (94%)** | **50** | **29** | **50.1** | **34%** | **15%** |
-| Redline v2 (Advisory+) | 484 (100%) | 60 | 1 | 166.1 | 10% | 42% |
+| **Redline v2 (Warning+)** | **456 / 485 (94%)** | **50** | **29** | **51.6** | **35%** | **15%** |
+| Redline v2 (Advisory+) | 484 (100%) | 60 | 1 | 173.0 | 12% | 42% |
 | Redline v1, trend only | 319 (66%) | 52 | 166 | 48.9 | 32% | 15% |
 | Naive WBGT alarm (≥ 28.2 °C) | 402 (83%) | 60 | 83 | 281.1 | 6% | 100% |
 | Naive heart-rate alarm | 91 (19%) | 57 | 394 | 66.5 | 10% | 15% |
@@ -329,9 +332,9 @@ ECTemp's core-temperature error against the hidden truth is **0.24 °C RMSE**, i
 
 | z | Detected | Median lead (min) | False alarms / 100 worker-shifts |
 |---|---|---|---|
-| 0 | 85% | 48 | 48 |
-| **0.5 (chosen)** | **94%** | **57** | **56** |
-| 1.0 | 97% | 60 | 65 |
+| 0 | 86% | 46 | 47 |
+| **0.5 (chosen)** | **94%** | **56** | **57** |
+| 1.0 | 97% | 60 | 69 |
 
 ---
 

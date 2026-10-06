@@ -13,7 +13,15 @@ export function isOverLimit(w: WorkerSnapshot): boolean {
 
 /** Resting after an alert: the worker is being looked after, not unattended. */
 export function isRecovering(w: WorkerSnapshot): boolean {
-  return w.resting && !w.signal_lost && w.level !== 'NONE'
+  if (w.signal_lost) return false
+  return !!w.directed_rest || (w.resting && w.level !== 'NONE')
+}
+
+export const REST_PLACE = { cooled: 'cooled shelter', shade: 'shade' } as const
+
+/** "until < 37.8 °C, HR < 95" for a rest that is held until the worker recovers. */
+export function restCondition(r: { core_below_c: number; hr_below_bpm: number }): string {
+  return `until < ${r.core_below_c.toFixed(1)} °C, HR < ${Math.round(r.hr_below_bpm)}`
 }
 
 /** Minute at which the current, unbroken over-limit stretch began (from tick history). */

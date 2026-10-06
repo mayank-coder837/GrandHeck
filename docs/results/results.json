@@ -11,24 +11,24 @@
       "detected": 456,
       "detection_rate": 0.9402061855670103,
       "median_lead_min": 50.5,
-      "mean_lead_min": 39.17982456140351,
+      "mean_lead_min": 39.223684210526315,
       "missed": 29,
-      "false_alarms": 802,
-      "false_alarms_per_100_worker_shifts": 50.125,
-      "precision": 0.34477124183006536,
-      "quiet_workers_alarmed_pct": 15.336322869955158
+      "false_alarms": 826,
+      "false_alarms_per_100_worker_shifts": 51.625,
+      "precision": 0.3490937746256895,
+      "quiet_workers_alarmed_pct": 15.246636771300448
     },
     "ours_advisory": {
       "label": "Redline v2 (Advisory or higher)",
       "detected": 484,
       "detection_rate": 0.9979381443298969,
       "median_lead_min": 60.0,
-      "mean_lead_min": 50.15909090909091,
+      "mean_lead_min": 50.06198347107438,
       "missed": 1,
-      "false_alarms": 2657,
-      "false_alarms_per_100_worker_shifts": 166.0625,
-      "precision": 0.10266801756163459,
-      "quiet_workers_alarmed_pct": 41.70403587443946
+      "false_alarms": 2768,
+      "false_alarms_per_100_worker_shifts": 173.0,
+      "precision": 0.12266244057052297,
+      "quiet_workers_alarmed_pct": 41.79372197309417
     },
     "ours_v1": {
       "label": "Redline v1, trend only (Warning or higher)",

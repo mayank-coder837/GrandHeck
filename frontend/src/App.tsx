@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertFeed, type AckMap } from './components/AlertFeed'
 import { CrewGrid, useStableRiskOrder } from './components/CrewGrid'
 import { CheatSheet, DemoControls, Toasts, useToasts } from './components/DemoControls'
@@ -41,14 +41,28 @@ export default function App() {
   toggleRef.current = togglePresentation
 
   const last = ticks[ticks.length - 1]
-  const workers = last?.workers ?? []
+  // Rest status (supervisor / demo actions) travels on the tick; attach it to each worker here
+  // so the card, feed and detail view all see the same thing.
+  const workers = useMemo(() => (last?.workers ?? []).map((w) => ({
+    ...w,
+    directed_rest: last?.rest?.[w.worker_id] ?? null,
+    pending_rest_min: last?.pending_rest?.[w.worker_id] ?? null,
+  })), [last])
   const byId = Object.fromEntries(workers.map((w) => [w.worker_id, w]))
   const order = useStableRiskOrder(workers)
   const selectedWorker = selected ? byId[selected] : undefined
   const name = (id: string) => byId[id]?.profile.name ?? id
 
   const latestAlert = (id: string) => [...alerts].reverse().find((a) => a.worker_id === id && ACTIONABLE.has(a.kind))
-  const acknowledge = (id: string, ts: string) => setAcks((a) => ({ ...a, [id]: ts }))
+  const acknowledge = (id: string, ts: string) => {
+    setAcks((a) => ({ ...a, [id]: ts }))
+    const w = byId[id]
+    if (!w) return
+    control({ action: 'ack', worker_id: id, level: w.level })
+    if (state?.auto_rest_on_ack && w.level === 'CRITICAL' && !w.directed_rest) {
+      toast(`${w.profile.name} heads to rest in ${state.auto_rest_delay_min} min (demo)`)
+    }
+  }
   const sendToRest = (id: string) => { control({ action: 'rest', worker_id: id }); toast(`Sent to rest: ${name(id)}`) }
   const step = (delta: number) => {
     if (!selected) return

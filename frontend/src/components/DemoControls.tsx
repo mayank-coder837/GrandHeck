@@ -109,6 +109,19 @@ export function DemoControls({ state, targetId, workerName, onToast, presentatio
             {state.paused && <button className="btn" onClick={() => control({ action: 'step' })}>+1 min</button>}
           </div>
           <div className="drawer-row">
+            <span className="drawer-label">Rest</span>
+            <select value={state.rest_location} aria-label="Where directed rests happen"
+              onChange={(e) => act({ action: 'rest_location', location: e.target.value }, `Rest location: ${e.target.value === 'cooled' ? 'cooled shelter' : 'shade'}`)}>
+              <option value="cooled">in a cooled shelter</option>
+              <option value="shade">in shade</option>
+            </select>
+            <label className="toggle">
+              <input type="checkbox" checked={state.auto_rest_on_ack}
+                onChange={(e) => act({ action: 'auto_rest', enabled: e.target.checked }, e.target.checked ? 'Auto-rest on acknowledge: on' : 'Auto-rest on acknowledge: off')} />
+              Acknowledging a Critical sends the worker to rest
+            </label>
+          </div>
+          <div className="drawer-row">
             <span className="drawer-label">Display</span>
             <label className="toggle">
               <input type="checkbox" checked={presentation} onChange={onTogglePresentation} />

@@ -61,7 +61,7 @@ function EntryCard({ e, acked, onRest, onAck, onSelect }: {
       <div className="entry-action">{actionHeadline(latest.action) || 'Check on the worker.'}</div>
       <div className="entry-buttons">
         {recovering
-          ? <span className="resting-note">Resting now</span>
+          ? <span className="resting-note">{w.directed_rest?.until_clear ? 'Resting until recovered' : 'Resting now'}</span>
           : <button className="btn primary" onClick={onRest}>Send to rest</button>}
         {!acked && <button className="btn" onClick={onAck}>Acknowledge</button>}
         <button className="btn link" onClick={() => setDetails(!details)} aria-expanded={details}>

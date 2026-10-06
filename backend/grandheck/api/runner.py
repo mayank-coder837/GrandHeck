@@ -17,6 +17,7 @@ from ..bus import Bus
 from ..pipeline.gateway import Gateway
 from ..sim.engine import Simulator
 from ..sim.weather import PROFILES
+from .rest_policy import RestPolicy
 
 Listener = Callable[[dict[str, Any]], Awaitable[None]]
 SPEEDS = [0.5, 1, 2, 5, 10, 20]
@@ -57,6 +58,7 @@ class DemoRunner:
         self.ticks: list[dict[str, Any]] = []
         self.alerts: list[dict[str, Any]] = []
         self.run_no = 0
+        self.rest_policy = RestPolicy()      # settings survive a new shift
         self.reset("normal", C.SIM_SHIFT_START_HOUR)
         self._task: asyncio.Task | None = None
 
@@ -75,6 +77,7 @@ class DemoRunner:
         self.gateway = Gateway(self.sim.profiles, self.bus)
         self.ticks, self.alerts = [], []
         self.truth: list[dict[str, Any]] = []
+        self.rest_policy.clear()
         for _ in range(warmup):
             self.step_once()
 
@@ -88,6 +91,9 @@ class DemoRunner:
             "paused": self.paused,
             "finished": self.sim.finished,
             "forecaster": self.gateway.forecaster_version,
+            "rest_location": self.rest_policy.location,
+            "auto_rest_on_ack": self.rest_policy.auto_rest_on_ack,
+            "auto_rest_delay_min": C.AUTO_REST_DELAY_MIN,
             "profiles": [p.model_dump() | {"age_band": p.age_band} for p in self.sim.profiles],
             "site": {"id": C.SITE_ID, "name": C.SITE_NAME, "lat": C.SITE_LAT_DEG, "lon": C.SITE_LON_DEG,
                      "utc_offset_h": C.SITE_UTC_OFFSET_H},
@@ -105,10 +111,13 @@ class DemoRunner:
     def step_once(self) -> dict[str, Any] | None:
         if self.sim.finished:
             return None
+        self.rest_policy.before_step(self.sim, self.gateway)
         st = self.sim.step()
         for topic, msg in st.messages:
             self.bus.publish(topic, msg)
         tick = self.gateway.tick(st.now)
+        self.rest_policy.after_tick(self.sim, self.gateway)
+        tick.update(self.rest_policy.snapshot(self.sim.minute))
         # Ground truth travels separately and is only shown in the UI's "truth" overlay.
         tick["truth"] = {w: {"core_c": round(t["tc_true"], 3), "working": t["working"]}
                          for w, t in st.truth.items()}

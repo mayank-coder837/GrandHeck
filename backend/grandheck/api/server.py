@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .rest_policy import LOCATIONS as REST_LOCATIONS
 from .runner import SPEEDS, DemoRunner
 
 FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend" / "dist"
@@ -35,11 +36,15 @@ app = FastAPI(title="Redline heat-strain gateway", lifespan=lifespan)
 
 
 class Control(BaseModel):
-    action: str                      # reset | pause | resume | speed | weather | spike | dropout | rest | step
+    action: str                      # reset | pause | resume | speed | weather | spike | dropout | rest | ack |
+                                     # rest_location | auto_rest | step
     weather: str | None = None
     start_hour: float | None = None
     speed: float | None = None
     worker_id: str | None = None
+    level: str | None = None          # ack: the level being acknowledged
+    location: str | None = None       # rest_location: "cooled" | "shade"
+    enabled: bool | None = None       # auto_rest: on/off
 
 
 @app.get("/api/state")
@@ -71,7 +76,17 @@ async def control(c: Control) -> dict[str, Any]:
     elif c.action == "dropout":
         sim.trigger_dropout(c.worker_id or "W5")
     elif c.action == "rest":
-        sim.send_to_rest(c.worker_id or "W1")
+        runner.rest_policy.start(sim, runner.gateway, c.worker_id or "W1")
+    elif c.action == "ack":
+        if c.worker_id is None:
+            raise HTTPException(400, "ack needs worker_id")
+        runner.rest_policy.acknowledge(sim, c.worker_id, c.level or "")
+    elif c.action == "rest_location":
+        if c.location not in REST_LOCATIONS:
+            raise HTTPException(400, f"location must be one of {REST_LOCATIONS}")
+        runner.rest_policy.location = c.location
+    elif c.action == "auto_rest":
+        runner.rest_policy.auto_rest_on_ack = bool(c.enabled)
     elif c.action == "step":
         tick = runner.step_once()
         if tick:
