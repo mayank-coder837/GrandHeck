@@ -12,6 +12,7 @@ export default function App() {
   const { state, ticks, alerts, connected } = useGateway()
   const [selected, setSelected] = useState<string | null>(null)
   const [acks, setAcks] = useState<AckMap>({})
+  const [showTruth, setShowTruth] = useState(false)
   const acknowledge = (workerId: string, ts: string) => setAcks((a) => ({ ...a, [workerId]: ts }))
   const sendToRest = (workerId: string) => control({ action: 'rest', worker_id: workerId })
   const last = ticks[ticks.length - 1]
@@ -35,15 +36,26 @@ export default function App() {
                 onSelect={() => setSelected(id === selected ? null : id)} />
             )}
           </CrewGrid>
-          {selectedWorker && state && (
-            <WorkerDetail worker={selectedWorker} ticks={ticks} utcOffsetH={state.site.utc_offset_h}
-              onClose={() => setSelected(null)} />
-          )}
         </section>
 
         <AlertFeed alerts={alerts} workers={workers} acks={acks} onAck={acknowledge}
           onRest={sendToRest} onSelect={setSelected} />
       </main>
+
+      {selectedWorker && state && last && (
+        <WorkerDetail worker={selectedWorker} ticks={ticks} alerts={alerts} utcOffsetH={state.site.utc_offset_h}
+          acked={(() => {
+            const lastAlert = [...alerts].reverse().find((a) => a.worker_id === selectedWorker.worker_id
+              && ['escalated', 'renotify', 'signal_lost'].includes(a.kind))
+            return !!lastAlert && acks[selectedWorker.worker_id] === lastAlert.ts
+          })()}
+          showTruth={showTruth} onToggleTruth={() => setShowTruth((v) => !v)}
+          onAck={(ts) => acknowledge(selectedWorker.worker_id, ts)}
+          onRest={() => sendToRest(selectedWorker.worker_id)}
+          onClose={() => setSelected(null)}
+          onPrev={() => setSelected(order[(order.indexOf(selectedWorker.worker_id) - 1 + order.length) % order.length])}
+          onNext={() => setSelected(order[(order.indexOf(selectedWorker.worker_id) + 1) % order.length])} />
+      )}
 
       {state && <ControlPanel state={state} selectedId={selected} />}
     </div>

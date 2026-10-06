@@ -1,173 +1,348 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer,
+  Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { LEVEL_LABEL, clockAt, fmt } from '../format'
-import type { Tick, WorkerSnapshot } from '../types'
+import { actionHeadline, isRecovering, orderedReasons, riskTags } from '../derive'
+import { LEVEL_LABEL, fmt } from '../format'
+import type { Alert, Tick, WorkerSnapshot } from '../types'
+import { CountdownSlot } from './WorkerCard'
+
+const HISTORY_WINDOW_MIN = 120
+const WBGT_SMOOTH_MIN = 5
+const NOWCAST_NOTE_THRESHOLD_C = 0.1
 
 const C = {
   core: '#38bdf8',
   truth: '#94a3b8',
   forecast: '#fb923c',
+  band: '#fb923c',
   limit: '#ef4444',
   hr: '#f472b6',
   psi: '#a78bfa',
   wbgt: '#facc15',
-  grid: '#1e293b',
-  axis: '#94a3b8',
+  grid: 'rgba(148,163,184,0.12)',
+  axis: '#8a9bb8',
+}
+const TOOLTIP_STYLE = { background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#e5ecf6' }
+const AXIS_TICK = { fontSize: 13, fill: C.axis }
+
+/** Minute <-> site clock, anchored on the last tick's own HH:MM. */
+function useClock(last: Tick) {
+  const lastMod = Number(last.ts.slice(11, 13)) * 60 + Number(last.ts.slice(14, 16))
+  const modOf = (m: number) => (((lastMod + m - last.minute) % 1440) + 1440) % 1440
+  const label = (m: number) => {
+    const mod = Math.round(modOf(m))
+    return `${String(Math.floor(mod / 60)).padStart(2, '0')}:${String(mod % 60).padStart(2, '0')}`
+  }
+  /** Ticks on round half-hours inside [from, to]. */
+  const halfHours = (from: number, to: number) => {
+    const out: number[] = []
+    const first = from + ((30 - (Math.round(modOf(from)) % 30)) % 30)
+    for (let m = first; m <= to; m += 30) out.push(m)
+    return out
+  }
+  return { label, halfHours }
 }
 
-interface Row {
-  minute: number
-  core?: number | null
-  truth?: number | null
-  forecast?: number | null
-  risk?: number | null
-  hr?: number | null
-  psi?: number | null
-  wbgt?: number | null
+function domainWithPadding(values: number[], pad: number, step = 0.1): [number, number] {
+  const lo = Math.min(...values) - pad
+  const hi = Math.max(...values) + pad
+  return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step]
 }
 
-export function WorkerDetail({ worker, ticks, utcOffsetH, onClose }: {
+export function WorkerDetail({
+  worker, ticks, alerts, utcOffsetH: _utc, acked, showTruth, onToggleTruth, onAck, onRest, onClose, onPrev, onNext,
+}: {
   worker: WorkerSnapshot
   ticks: Tick[]
+  alerts: Alert[]
   utcOffsetH: number
+  acked: boolean
+  showTruth: boolean
+  onToggleTruth: () => void
+  onAck: (ts: string) => void
+  onRest: () => void
   onClose: () => void
+  onPrev: () => void
+  onNext: () => void
 }) {
-  const [showTruth, setShowTruth] = useState(false)
+  const [protocol, setProtocol] = useState(false)
+  const [details, setDetails] = useState(false)
   const id = worker.worker_id
   const last = ticks[ticks.length - 1]
+  const clock = useClock(last)
+  const now = last.minute
+  const start = Math.max(ticks[0].minute, now - HISTORY_WINDOW_MIN)
+  const limit = worker.core_limit_c
 
-  const rows = useMemo<Row[]>(() => {
-    const out: Row[] = ticks.map((t) => {
-      const w = t.workers.find((x) => x.worker_id === id)
-      return {
-        minute: t.minute,
-        core: w?.point.core_c ?? null,
-        truth: t.truth?.[id]?.core_c ?? null,
-        hr: w?.point.hr ?? null,
-        psi: w?.point.psi ?? null,
-        wbgt: t.site.wbgt_c,
-      }
-    })
-    if (last && !worker.forecast_stale && !worker.signal_lost) {
-      const future = new Map<number, Row>()
-      const at = (k: number) => {
-        if (k === 0) return out[out.length - 1]
-        if (!future.has(k)) future.set(k, { minute: last.minute + k })
-        return future.get(k)!
-      }
-      worker.forecast_line.forEach(([k, v]) => { at(k).forecast = v })
-      worker.risk_line.forEach(([k, v]) => { at(k).risk = v })
-      out.push(...[...future.values()].sort((a, b) => a.minute - b.minute))
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowLeft') onPrev()
+      else if (e.key === 'ArrowRight') onNext()
+      else if (e.key === 'g' || e.key === 'G') onToggleTruth()
     }
-    return out
-  }, [ticks, id, worker, last])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, onPrev, onNext, onToggleTruth])
 
-  if (!last) return null
-  const tickFmt = (m: number) => clockAt(last.ts, last.minute, m, utcOffsetH)
-  const xDomain: [number, number] = [rows[0]?.minute ?? 0, rows[rows.length - 1]?.minute ?? 1]
+  // ----- data -----
+  const history = useMemo(() => ticks.filter((t) => t.minute >= start).map((t) => {
+    const w = t.workers.find((x) => x.worker_id === id)
+    return {
+      minute: t.minute,
+      core: w?.point.core_c ?? null,
+      truth: t.truth?.[id]?.core_c ?? null,
+      hr: w?.point.hr ?? null,
+      psi: w?.point.psi ?? null,
+      wbgtRaw: t.site.wbgt_c,
+    }
+  }), [ticks, id, start])
+
+  const smallRows = useMemo(() => history.map((r, i) => {
+    const win = history.slice(Math.max(0, i - WBGT_SMOOTH_MIN + 1), i + 1).map((x) => x.wbgtRaw).filter((v): v is number => v != null)
+    return { ...r, wbgt: win.length ? win.reduce((a, b) => a + b, 0) / win.length : null }
+  }), [history])
+
+  const showForecast = !worker.forecast_stale && !worker.signal_lost && worker.forecast_line.length > 0
+  const nowcast = worker.forecast_line.find(([k]) => k === 0)?.[1] ?? null
+  const coreRows = useMemo(() => {
+    type Row = { minute: number; core?: number | null; truth?: number | null; forecast?: number; band?: [number, number] }
+    const rows: Row[] = history.map(({ minute, core, truth }) => ({ minute, core, truth }))
+    if (showForecast && rows.length) {
+      // The forecast is drawn from the current estimate, so the line starts exactly at "now".
+      const est = worker.core_c
+      rows[rows.length - 1].forecast = est
+      rows[rows.length - 1].band = [est, est]
+      const risk = new Map(worker.risk_line.map(([k, v]) => [k, v]))
+      for (const [k, v] of worker.forecast_line) {
+        if (k <= 0) continue
+        const r = risk.get(k) ?? v
+        rows.push({ minute: now + k, forecast: v, band: [Math.min(v, r), Math.max(v, r)] })
+      }
+    }
+    return rows
+  }, [history, showForecast, worker, now])
+
+  const end = coreRows[coreRows.length - 1]?.minute ?? now
+  const coreValues = [limit, ...coreRows.flatMap((r) => [
+    r.core, showTruth ? r.truth : null, r.forecast, ...(r.band ?? []),
+  ]).filter((v): v is number => v != null)]
+  const coreDomain = domainWithPadding(coreValues, 0.2)
+
+  const wbgtVals = smallRows.map((r) => r.wbgt).filter((v): v is number => v != null)
+  const wbgtDomain = domainWithPadding([...wbgtVals, worker.wbgt_limit_c], 1.0, 1)
+  const hrVals = smallRows.map((r) => r.hr).filter((v): v is number => v != null)
+  const hrDomain = hrVals.length ? domainWithPadding(hrVals, 8, 10) : [50, 190] as [number, number]
+
+  // ----- header bits -----
   const p = worker.profile
-  const commonX = (
-    <XAxis dataKey="minute" type="number" domain={xDomain} tickFormatter={tickFmt}
-      stroke={C.axis} tick={{ fontSize: 13 }} minTickGap={40} />
+  const recovering = isRecovering(worker)
+  const tags = riskTags(worker, 3)
+  const latest = [...alerts].reverse().find((a) => a.worker_id === id && ['escalated', 'renotify', 'signal_lost'].includes(a.kind))
+  const needsAction = worker.signal_lost || worker.level !== 'NONE'
+  const chip = worker.signal_lost ? ['LOST', 'NO SIGNAL'] : recovering ? ['RECOVERING', 'RESTING'] : [worker.level, LEVEL_LABEL[worker.level]]
+  const expectedTip = worker.ttc_expected_min == null
+    ? 'Expected (central forecast): no crossing within 2 h'
+    : `Expected (central forecast): ${Math.round(worker.ttc_expected_min)} min. The countdown uses the earlier, likely-range edge.`
+  const slope = worker.core_slope_c_per_h
+
+  const coreXTicks = clock.halfHours(start, end)
+  const smallXTicks = clock.halfHours(start, now)
+  const axisX = (domainEnd: number, xticks: number[]) => (
+    <XAxis dataKey="minute" type="number" domain={[start, domainEnd]} ticks={xticks}
+      tickFormatter={clock.label} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} />
   )
+  const tooltipLabel = (m: unknown) => clock.label(Number(m))
 
   return (
-    <section className={`detail level-${worker.level}`}>
-      <div className="detail-head">
-        <div>
-          <h2>{p.name} <span className="muted">· {p.role}</span></h2>
-          <div className="muted">
-            {p.acclimatized ? 'Acclimatized' : 'Not acclimatized'} · {worker.workload_observed} work
-            {worker.workload_observed !== p.workload && ` (assigned ${p.workload})`} · age {p.age} ·
-            core limit {worker.core_limit_c.toFixed(1)} °C · WBGT limit {worker.wbgt_limit_c.toFixed(1)} °C
-            {' '}({p.acclimatized ? 'NIOSH REL' : 'NIOSH RAL'})
+    <div className="overlay" onClick={onClose}>
+      <aside className={`focus level-${worker.level}`} onClick={(e) => e.stopPropagation()} role="dialog"
+        aria-label={`${p.name} details`}>
+        {/* ---------- header ---------- */}
+        <div className="focus-head">
+          <div className="focus-id">
+            <div className="focus-title">
+              <h2>{p.name}</h2>
+              <span className="muted">{p.role}</span>
+              {(needsAction || recovering) && <span className={`level-chip level-${chip[0]}`}>{chip[1]}</span>}
+            </div>
+            <div className="card-tags">{tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+          </div>
+          <div className="focus-nav">
+            <button className="btn icon" onClick={onPrev} aria-label="Previous worker" title="Previous (←)">‹</button>
+            <button className="btn icon" onClick={onNext} aria-label="Next worker" title="Next (→)">›</button>
+            <button className="btn icon" onClick={onClose} aria-label="Close" title="Close (Esc)">✕</button>
           </div>
         </div>
-        <div className="detail-kpis">
-          <div><div className="label">Status</div><div className={`level-chip level-${worker.level}`}>{LEVEL_LABEL[worker.level]}</div></div>
-          <div>
-            <div className="label">Time to critical · earliest likely</div>
-            <div className="kpi">{worker.signal_lost ? 'no signal' : worker.ttc_min === null ? '> 120' : Math.round(worker.ttc_min)}<small> min</small></div>
+
+        <div className="focus-kpis">
+          <div className="hero-kpi" title={expectedTip}>
+            <div className="kpi-label">Time to critical</div>
+            <CountdownSlot w={worker} ticks={ticks} size="hero" />
           </div>
-          <div>
-            <div className="label">Expected</div>
-            <div className="kpi">{worker.signal_lost || worker.ttc_expected_min === null ? '—' : Math.round(worker.ttc_expected_min)}<small> min</small></div>
+          <div className="kpi">
+            <div className="kpi-label">Core temp</div>
+            <div className="kpi-value">{fmt(worker.core_c, 1)}<span className="unit">°C</span>
+              <span className="kpi-of"> / limit {limit.toFixed(1)} °C</span></div>
           </div>
-          <div><div className="label">Core trend</div><div className="kpi">{fmt(worker.core_slope_c_per_h, 1)}<small> °C/h</small></div></div>
-          <div><div className="label">Above WBGT limit</div><div className="kpi">{worker.exposure_total_min}<small> min</small></div></div>
+          <div className="kpi">
+            <div className="kpi-label">Core trend</div>
+            <div className="kpi-value">{slope == null ? '—' : `${slope > 0 ? '+' : ''}${slope.toFixed(1)}`}<span className="unit">°C/h</span></div>
+          </div>
+          <div className="kpi">
+            <div className="kpi-label">Above heat limit</div>
+            <div className="kpi-value">{worker.exposure_total_min}<span className="unit">min</span></div>
+          </div>
         </div>
-        <button className="close" onClick={onClose} aria-label="Close">✕</button>
-      </div>
 
-      {worker.reasons.length > 0 && (
-        <div className="why big-why"><b>Contributing factors:</b> {worker.reasons.join(' · ')}</div>
-      )}
+        {needsAction && latest ? (
+          <div className={`focus-action level-${chip[0]}`}>
+            <div className="focus-action-text">{actionHeadline(latest.action) || 'Check on the worker.'}</div>
+            <div className="entry-buttons">
+              {recovering
+                ? <span className="resting-note">Resting now</span>
+                : <button className="btn primary" onClick={onRest}>Send to rest</button>}
+              {!acked && <button className="btn" onClick={() => onAck(latest.ts)}>Acknowledge</button>}
+              <button className="btn link" onClick={() => setProtocol(!protocol)} aria-expanded={protocol}>
+                Full protocol {protocol ? '▾' : '▸'}
+              </button>
+            </div>
+            {protocol && <p className="protocol">{latest.action}</p>}
+          </div>
+        ) : (
+          <div className="focus-action calm">No action needed. Keep the normal work–rest schedule and hydration.</div>
+        )}
 
-      <div className="charts">
-        <div className="chart wide">
-          <div className="chart-title">
-            Estimated core temperature (ECTemp, from heart rate) and forecast
-            <label className="toggle">
-              <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
-              show simulator ground truth
+        {worker.reasons.length > 0 && (
+          <div className="focus-why"><b>Why:</b>{' '}
+            {orderedReasons(worker.reasons).map((r, i) => (
+              <span key={i} className={r.site ? 'muted' : ''}>{i > 0 && ' · '}{r.text}</span>
+            ))}
+          </div>
+        )}
+
+        {/* ---------- main chart ---------- */}
+        <div className="chart-block">
+          <div className="chart-head">
+            <h3>Core temperature (estimated from heart rate)</h3>
+            <div className="legend">
+              <span><i className="sw line" style={{ background: C.core }} />Estimated core temp</span>
+              {showForecast && <span><i className="sw dash" style={{ borderColor: C.forecast }} />Forecast</span>}
+              {showForecast && worker.risk_line.length > 0 && <span><i className="sw band" style={{ background: C.band }} />Likely range</span>}
+              <span><i className="sw line" style={{ background: C.limit }} />Danger limit</span>
+              {showTruth && <span><i className="sw line" style={{ background: C.truth }} />True core temp (sim)</span>}
+            </div>
+            <label className="toggle small" title="Shortcut: G">
+              <input type="checkbox" checked={showTruth} onChange={onToggleTruth} />
+              Compare with true core temp (simulation only)
             </label>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={rows} margin={{ top: 8, right: 24, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke={C.grid} />
-              {commonX}
-              <YAxis domain={[36.8, 39.2]} stroke={C.axis} tick={{ fontSize: 13 }} unit="°" width={48} />
-              <Tooltip labelFormatter={(m) => tickFmt(Number(m))} contentStyle={{ background: '#0f172a', border: '1px solid #334155' }} />
-              <ReferenceLine y={worker.core_limit_c} stroke={C.limit} strokeWidth={2} strokeDasharray="6 4"
-                label={{ value: `danger ${worker.core_limit_c.toFixed(1)}°C`, fill: C.limit, position: 'insideTopLeft', fontSize: 13 }} />
-              <ReferenceLine x={last.minute} stroke="#475569" />
-              <Line dataKey="core" name="Core (est.)" stroke={C.core} strokeWidth={3} dot={false} isAnimationActive={false} connectNulls={false} />
-              <Line dataKey="forecast" name="Forecast" stroke={C.forecast} strokeWidth={3} strokeDasharray="8 5" dot={false} isAnimationActive={false} />
-              {worker.risk_line.length > 0 && (
-                <Line dataKey="risk" name="Risk edge (warns when it hits the limit)" stroke={C.forecast} strokeWidth={1.5}
-                  strokeDasharray="2 4" dot={false} isAnimationActive={false} />
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={coreRows} margin={{ top: 16, right: 112, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke={C.grid} vertical={false} />
+              {axisX(end, coreXTicks)}
+              <YAxis domain={coreDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={48}
+                tickFormatter={(v) => `${Number(v).toFixed(1)}°`} allowDataOverflow={false} />
+              <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE}
+                formatter={(v, name) => Array.isArray(v) ? [`${Number(v[0]).toFixed(2)}–${Number(v[1]).toFixed(2)} °C`, name] : [`${Number(v).toFixed(2)} °C`, name]} />
+              <ReferenceArea y1={limit} y2={coreDomain[1]} fill={C.limit} fillOpacity={0.07} ifOverflow="hidden" />
+              <ReferenceLine y={limit} stroke={C.limit} strokeWidth={2}
+                label={{ value: `Danger ${limit.toFixed(1)} °C`, position: 'right', fill: C.limit, fontSize: 13, fontWeight: 700 }} />
+              <ReferenceLine x={now} stroke="#64748b" strokeDasharray="3 3"
+                label={{ value: 'now', position: 'top', fill: C.axis, fontSize: 12 }} />
+              {showForecast && (
+                <Area dataKey="band" name="Likely range" stroke="none" fill={C.band} fillOpacity={0.18} isAnimationActive={false} connectNulls />
               )}
-              {showTruth && <Line dataKey="truth" name="Ground truth (sim)" stroke={C.truth} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
-              <Legend />
-            </LineChart>
+              <Line dataKey="core" name="Estimated core temp" stroke={C.core} strokeWidth={3} dot={false} isAnimationActive={false} connectNulls={false} />
+              {showForecast && (
+                <Line dataKey="forecast" name="Forecast" stroke={C.forecast} strokeWidth={3} strokeDasharray="8 5" dot={false} isAnimationActive={false} connectNulls />
+              )}
+              {showTruth && <Line dataKey="truth" name="True core temp (sim)" stroke={C.truth} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
+            </ComposedChart>
           </ResponsiveContainer>
+          {showForecast && nowcast != null && Math.abs(nowcast - worker.core_c) > NOWCAST_NOTE_THRESHOLD_C && (
+            <div className="chart-note">
+              Model-corrected current core temp: {nowcast.toFixed(1)} °C. The heart-rate estimate lags when core temperature
+              changes fast; the forecast model corrects for that lag.
+            </div>
+          )}
         </div>
 
-        <div className="chart">
-          <div className="chart-title">Heart rate and PSI</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke={C.grid} />
-              {commonX}
-              <YAxis yAxisId="hr" domain={[50, 190]} stroke={C.hr} tick={{ fontSize: 13 }} width={40} />
-              <YAxis yAxisId="psi" orientation="right" domain={[0, 10]} stroke={C.psi} tick={{ fontSize: 13 }} width={30} />
-              <Tooltip labelFormatter={(m) => tickFmt(Number(m))} contentStyle={{ background: '#0f172a', border: '1px solid #334155' }} />
-              <ReferenceLine yAxisId="psi" y={7} stroke={C.psi} strokeDasharray="4 4" />
-              <Line yAxisId="hr" dataKey="hr" name="HR (bpm)" stroke={C.hr} dot={false} isAnimationActive={false} />
-              <Line yAxisId="psi" dataKey="psi" name="PSI" stroke={C.psi} strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Legend />
-            </LineChart>
-          </ResponsiveContainer>
+        {/* ---------- small charts ---------- */}
+        <div className="small-charts">
+          <div className="chart-block">
+            <h3>Heart rate (bpm)</h3>
+            <ResponsiveContainer width="100%" height={150}>
+              <LineChart data={smallRows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={C.grid} vertical={false} />
+                {axisX(now, smallXTicks)}
+                <YAxis domain={hrDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={40} />
+                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${Number(v).toFixed(0)} bpm`, 'Heart rate']} />
+                <Line dataKey="hr" stroke={C.hr} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-block">
+            <h3>Strain index (PSI 0–10)</h3>
+            <ResponsiveContainer width="100%" height={150}>
+              <LineChart data={smallRows} margin={{ top: 8, right: 84, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={C.grid} vertical={false} />
+                {axisX(now, smallXTicks)}
+                <YAxis domain={[0, 10]} ticks={[0, 3, 5, 7, 10]} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
+                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE} formatter={(v) => [Number(v).toFixed(1), 'PSI']} />
+                <ReferenceLine y={7} stroke={C.psi} strokeDasharray="4 4"
+                  label={{ value: 'High strain 7', position: 'right', fill: C.psi, fontSize: 12 }} />
+                <Line dataKey="psi" stroke={C.psi} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-block">
+            <h3>Heat stress (WBGT) vs this worker's limit</h3>
+            <ResponsiveContainer width="100%" height={150}>
+              <LineChart data={smallRows} margin={{ top: 8, right: 84, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={C.grid} vertical={false} />
+                {axisX(now, smallXTicks)}
+                <YAxis domain={wbgtDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={36}
+                  tickFormatter={(v) => `${Number(v).toFixed(0)}°`} />
+                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const r = payload[0].payload as { wbgt: number | null; wbgtRaw: number | null }
+                    return (
+                      <div style={{ ...TOOLTIP_STYLE, padding: '6px 10px' }}>
+                        <div>{tooltipLabel(label)}</div>
+                        <div>WBGT {fmt(r.wbgtRaw, 1, ' °C')} <span style={{ color: C.axis }}>(5-min mean {fmt(r.wbgt, 1)})</span></div>
+                      </div>
+                    )
+                  }} />
+                <ReferenceArea y1={worker.wbgt_limit_c} y2={wbgtDomain[1]} fill={C.limit} fillOpacity={0.07} ifOverflow="hidden" />
+                <ReferenceLine y={worker.wbgt_limit_c} stroke={C.limit} strokeWidth={1.5}
+                  label={{ value: `Limit ${worker.wbgt_limit_c.toFixed(1)} °C`, position: 'right', fill: C.limit, fontSize: 12 }} />
+                <Line dataKey="wbgt" stroke={C.wbgt} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div className="chart">
-          <div className="chart-title">WBGT vs. this worker's limit</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke={C.grid} />
-              {commonX}
-              <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke={C.axis} tick={{ fontSize: 13 }} unit="°" width={44}
-                tickFormatter={(v) => Number(v).toFixed(0)} />
-              <Tooltip labelFormatter={(m) => tickFmt(Number(m))} contentStyle={{ background: '#0f172a', border: '1px solid #334155' }} />
-              <ReferenceLine y={worker.wbgt_limit_c} stroke={C.limit} strokeDasharray="6 4"
-                label={{ value: 'limit', fill: C.limit, position: 'insideTopLeft', fontSize: 13 }} />
-              <Line dataKey="wbgt" name="WBGT" stroke={C.wbgt} strokeWidth={2} dot={false} isAnimationActive={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </section>
+        <button className="btn link" onClick={() => setDetails(!details)} aria-expanded={details}>
+          Details {details ? '▾' : '▸'}
+        </button>
+        {details && (
+          <dl className="focus-details">
+            <div><dt>Core temperature limit</dt><dd>{limit.toFixed(1)} °C ({p.acclimatized ? 'acclimatized' : 'unacclimatized'}, ACGIH)</dd></div>
+            <div><dt>WBGT limit</dt><dd>{worker.wbgt_limit_c.toFixed(1)} °C ({p.acclimatized ? 'NIOSH REL' : 'NIOSH RAL'}, {worker.workload_observed} work)</dd></div>
+            <div><dt>Workload</dt><dd>assigned {p.workload}, observed {worker.workload_observed}</dd></div>
+            <div><dt>Age</dt><dd>{p.age}</dd></div>
+            <div><dt>Resting heart rate</dt><dd>{fmt(p.resting_hr, 0, ' bpm')}</dd></div>
+            <div><dt>Strain index</dt><dd>{fmt(worker.psi, 1)} {worker.psi_band ? `(${worker.psi_band})` : ''}</dd></div>
+            <div><dt>Time since rest</dt><dd>{worker.minutes_since_rest} min</dd></div>
+            <div><dt>Above heat limit since last rest</dt><dd>{worker.exposure_continuous_min} min</dd></div>
+          </dl>
+        )}
+      </aside>
+    </div>
   )
 }
