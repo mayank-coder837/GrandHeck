@@ -3,6 +3,7 @@ import { AlertFeed, type AckMap } from './components/AlertFeed'
 import { CrewBanner } from './components/CrewBanner'
 import { CrewGrid, useStableRiskOrder } from './components/CrewGrid'
 import { CheatSheet, DemoControls, Toasts, useToasts } from './components/DemoControls'
+import { ShiftOverview } from './components/ShiftOverview'
 import { TopBar } from './components/TopBar'
 import { WorkerCard } from './components/WorkerCard'
 import { WorkerDetail } from './components/WorkerDetail'
@@ -17,7 +18,22 @@ export default function App() {
   const [acks, setAcks] = useState<AckMap>({})
   const [showTruth, setShowTruth] = useState(false)
   const [cheatSheet, setCheatSheet] = useState(false)
+  const [presentation, setPresentation] = useState(() => {
+    try { return localStorage.getItem('redline.presentation') === '1' } catch { return false }
+  })
   const { toasts, push: toast } = useToasts()
+
+  // Presentation mode scales the whole UI (~20%) by changing the root font size.
+  useEffect(() => {
+    document.documentElement.classList.toggle('present', presentation)
+    try { localStorage.setItem('redline.presentation', presentation ? '1' : '0') } catch { /* private mode */ }
+  }, [presentation])
+  const togglePresentation = () => {
+    toast(presentation ? 'Presentation mode off' : 'Presentation mode on')
+    setPresentation(!presentation)
+  }
+  const toggleRef = useRef(togglePresentation)
+  toggleRef.current = togglePresentation
 
   const last = ticks[ticks.length - 1]
   const workers = last?.workers ?? []
@@ -63,6 +79,7 @@ export default function App() {
         const speed = st.speeds[Number(k) - 1]
         if (speed !== undefined) { control({ action: 'speed', speed }); toast(`Speed ${speed}×`) }
       }
+      else if (k === 'p') toggleRef.current()
       else if (k === '?') setCheatSheet((v) => !v)
     }
     window.addEventListener('keydown', onKey)
@@ -84,6 +101,8 @@ export default function App() {
               <WorkerCard w={byId[id]} ticks={ticks} selected={id === selected} onSelect={() => setSelected(id)} />
             )}
           </CrewGrid>
+          <ShiftOverview ticks={ticks} alerts={alerts}
+            names={Object.fromEntries(workers.map((w) => [w.worker_id, w.profile.name]))} />
         </section>
 
         <AlertFeed alerts={alerts} workers={workers} acks={acks} onAck={acknowledge}
@@ -99,7 +118,8 @@ export default function App() {
           onClose={() => setSelected(null)} onPrev={() => step(-1)} onNext={() => step(1)} />
       )}
 
-      {state && <DemoControls state={state} targetId={selected} workerName={name} onToast={toast} />}
+      {state && <DemoControls state={state} targetId={selected} workerName={name} onToast={toast}
+        presentation={presentation} onTogglePresentation={togglePresentation} />}
       {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
       <Toasts toasts={toasts} />
     </div>

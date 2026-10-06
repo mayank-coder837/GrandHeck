@@ -118,7 +118,7 @@ export function AlertFeed({ alerts, workers, acks, onAck, onRest, onSelect }: {
   const resolved = sorted.filter((e) => !isActive(e) && LEVEL_RANK[e.latest.level] >= minRank)
 
   const watch = [...workers]
-    .filter((w) => !w.signal_lost && w.ttc_min !== null && w.ttc_min > 0)
+    .filter((w) => !w.signal_lost && !w.resting && w.ttc_min !== null && w.ttc_min > 0)
     .sort((a, b) => a.ttc_min! - b.ttc_min!)
     .slice(0, 3)
 

@@ -6,50 +6,13 @@ import {
 import { actionHeadline, isRecovering, orderedReasons, riskTags } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
 import type { Alert, Tick, WorkerSnapshot } from '../types'
+import { AXIS_TICK, CHART, TOOLTIP_STYLE, domainWithPadding, makeClock, rollingMean } from '../chartUtils'
 import { CountdownSlot } from './WorkerCard'
 
 const HISTORY_WINDOW_MIN = 120
 const WBGT_SMOOTH_MIN = 5
 const NOWCAST_NOTE_THRESHOLD_C = 0.1
-
-const C = {
-  core: '#38bdf8',
-  truth: '#94a3b8',
-  forecast: '#fb923c',
-  band: '#fb923c',
-  limit: '#ef4444',
-  hr: '#f472b6',
-  psi: '#a78bfa',
-  wbgt: '#facc15',
-  grid: 'rgba(148,163,184,0.12)',
-  axis: '#8a9bb8',
-}
-const TOOLTIP_STYLE = { background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#e5ecf6' }
-const AXIS_TICK = { fontSize: 13, fill: C.axis }
-
-/** Minute <-> site clock, anchored on the last tick's own HH:MM. */
-function useClock(last: Tick) {
-  const lastMod = Number(last.ts.slice(11, 13)) * 60 + Number(last.ts.slice(14, 16))
-  const modOf = (m: number) => (((lastMod + m - last.minute) % 1440) + 1440) % 1440
-  const label = (m: number) => {
-    const mod = Math.round(modOf(m))
-    return `${String(Math.floor(mod / 60)).padStart(2, '0')}:${String(mod % 60).padStart(2, '0')}`
-  }
-  /** Ticks on round half-hours inside [from, to]. */
-  const halfHours = (from: number, to: number) => {
-    const out: number[] = []
-    const first = from + ((30 - (Math.round(modOf(from)) % 30)) % 30)
-    for (let m = first; m <= to; m += 30) out.push(m)
-    return out
-  }
-  return { label, halfHours }
-}
-
-function domainWithPadding(values: number[], pad: number, step = 0.1): [number, number] {
-  const lo = Math.min(...values) - pad
-  const hi = Math.max(...values) + pad
-  return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step]
-}
+const C = CHART
 
 export function WorkerDetail({
   worker, ticks, alerts, acked, showTruth, onToggleTruth, onAck, onRest, onClose, onPrev, onNext,
@@ -70,7 +33,7 @@ export function WorkerDetail({
   const [details, setDetails] = useState(false)
   const id = worker.worker_id
   const last = ticks[ticks.length - 1]
-  const clock = useClock(last)
+  const clock = makeClock(last)
   const now = last.minute
   const start = Math.max(ticks[0].minute, now - HISTORY_WINDOW_MIN)
   const limit = worker.core_limit_c
@@ -99,10 +62,10 @@ export function WorkerDetail({
     }
   }), [ticks, id, start])
 
-  const smallRows = useMemo(() => history.map((r, i) => {
-    const win = history.slice(Math.max(0, i - WBGT_SMOOTH_MIN + 1), i + 1).map((x) => x.wbgtRaw).filter((v): v is number => v != null)
-    return { ...r, wbgt: win.length ? win.reduce((a, b) => a + b, 0) / win.length : null }
-  }), [history])
+  const smallRows = useMemo(() => {
+    const smooth = rollingMean(history.map((r) => r.wbgtRaw), WBGT_SMOOTH_MIN)
+    return history.map((r, i) => ({ ...r, wbgt: smooth[i] }))
+  }, [history])
 
   const showForecast = !worker.forecast_stale && !worker.signal_lost && worker.forecast_line.length > 0
   const nowcast = worker.forecast_line.find(([k]) => k === 0)?.[1] ?? null
@@ -179,7 +142,7 @@ export function WorkerDetail({
         <div className="focus-kpis">
           <div className="hero-kpi" title={expectedTip}>
             <div className="kpi-label">Time to critical</div>
-            <CountdownSlot w={worker} ticks={ticks} size="hero" />
+            <CountdownSlot w={worker} ticks={ticks} />
           </div>
           <div className="kpi">
             <div className="kpi-label">Core temp</div>

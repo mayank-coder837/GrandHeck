@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useState } from 'react'
 import type { Alert, RunState, ServerMessage, Tick } from './types'
 
-const MAX_TICKS = 240
-const MAX_ALERTS = 300
+const MAX_TICKS = 600      // a full shift, for the shift overview
+const MAX_ALERTS = 1000
 
 interface Store {
   state: RunState | null

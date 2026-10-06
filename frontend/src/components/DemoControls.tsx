@@ -30,6 +30,7 @@ export const SHORTCUTS: [string, string][] = [
   ['N', 'New shift: normal hot day'],
   ['B', 'New shift: heat building'],
   ['G', 'Compare with true core temp (in the detail view)'],
+  ['P', 'Presentation mode (larger text for a projector)'],
   ['Space', 'Pause / resume'],
   ['1–5', 'Speed'],
   ['← →', 'Previous / next worker (detail view)'],
@@ -54,11 +55,13 @@ export function CheatSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** Small floating "Demo" button that opens the presenter's controls. */
-export function DemoControls({ state, targetId, workerName, onToast }: {
+export function DemoControls({ state, targetId, workerName, onToast, presentation, onTogglePresentation }: {
   state: RunState
   targetId: string | null
   workerName: (id: string) => string
   onToast: (text: string) => void
+  presentation: boolean
+  onTogglePresentation: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [startHour, setStartHour] = useState(7)
@@ -103,6 +106,13 @@ export function DemoControls({ state, targetId, workerName, onToast }: {
               {state.paused ? '▶ Resume' : '⏸ Pause'}
             </button>
             {state.paused && <button className="btn" onClick={() => control({ action: 'step' })}>+1 min</button>}
+          </div>
+          <div className="drawer-row">
+            <span className="drawer-label">Display</span>
+            <label className="toggle">
+              <input type="checkbox" checked={presentation} onChange={onTogglePresentation} />
+              Presentation mode (P)
+            </label>
           </div>
           <div className="drawer-foot muted small">Press ? for keyboard shortcuts</div>
         </div>

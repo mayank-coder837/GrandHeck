@@ -20,6 +20,8 @@ from ..sim.weather import PROFILES
 
 Listener = Callable[[dict[str, Any]], Awaitable[None]]
 SPEEDS = [0.5, 1, 2, 5, 10, 20]
+SNAPSHOT_TICKS = 600        # a whole shift, so the dashboard's shift overview survives a reload
+SNAPSHOT_ALERTS = 1000
 DB_PATH = Path(__file__).resolve().parents[3] / "data" / "grandheck.db"
 
 
@@ -136,5 +138,5 @@ class DemoRunner:
 
     def snapshot_message(self) -> dict[str, Any]:
         """Everything a newly connected client needs to draw the full picture."""
-        return {"type": "init", "state": self.state(), "ticks": self.ticks[-C.HISTORY_MINUTES:],
-                "alerts": self.alerts[-200:]}
+        return {"type": "init", "state": self.state(), "ticks": self.ticks[-SNAPSHOT_TICKS:],
+                "alerts": self.alerts[-SNAPSHOT_ALERTS:]}

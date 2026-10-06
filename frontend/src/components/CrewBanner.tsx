@@ -28,11 +28,9 @@ export function CrewBanner({ workers, site }: { workers: WorkerSnapshot[]; site?
 
   return (
     <section className={`banner worst-${parts.length ? worst : 'NONE'}`} aria-live="polite">
-      <div className="banner-headline">{workers.length ? headline : 'Connecting…'}</div>
-      <div className="banner-sub">
-        {siteHeatLine(site) && <span>{siteHeatLine(site)}</span>}
-        <span className="muted">Countdowns show time to critical strain if nothing changes.</span>
-      </div>
+      <span className="banner-headline">{workers.length ? headline : 'Connecting…'}</span>
+      {siteHeatLine(site) && <span className="banner-site">{siteHeatLine(site)}</span>}
+      <span className="banner-caption">Countdowns show time to critical strain if nothing changes.</span>
     </section>
   )
 }

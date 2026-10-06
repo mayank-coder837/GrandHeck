@@ -4,14 +4,17 @@ import {
 } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
 import type { Tick, WorkerSnapshot } from '../types'
-import { RedlineMeter } from './RedlineMeter'
+import { Sparkline } from './Sparkline'
 
-/** The one fixed-height slot that says how long until it gets critical. */
-export function CountdownSlot({ w, ticks, size = 'card' }: { w: WorkerSnapshot; ticks: Tick[]; size?: 'card' | 'hero' }) {
+/**
+ * How long until it gets critical, as one row: the big value and its state text
+ * side by side. Only real countdown numbers use the hero size.
+ */
+export function CountdownSlot({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }) {
   const last = ticks[ticks.length - 1]
   let main: React.ReactNode
   let sub: React.ReactNode = null
-  let tone = 'level'
+  let tone = 'word'
 
   if (w.signal_lost) {
     tone = 'lost'
@@ -22,32 +25,34 @@ export function CountdownSlot({ w, ticks, size = 'card' }: { w: WorkerSnapshot; 
     tone = 'recovering'
     main = 'Recovering'
     const s = w.core_slope_c_per_h
-    sub = s == null ? 'Resting' : `Resting · ${s <= 0 ? '↓' : '↑'} ${Math.abs(s).toFixed(1)} °C/h`
+    sub = s == null ? 'resting' : `resting · ${s <= 0 ? '↓' : '↑'} ${Math.abs(s).toFixed(1)} °C/h`
   } else if (isOverLimit(w)) {
-    main = 'OVER LIMIT'
+    tone = 'alarm'
+    main = 'Over limit'
     const since = overLimitSince(ticks, w)
     sub = since != null && last ? `for ${formatDuration(last.minute - since)}` : 'now'
   } else if (w.forecast_stale) {
     tone = 'muted'
     const p = calibrationProgress(ticks, w.worker_id)
-    main = <span className="calibrating">Calibrating…</span>
+    main = 'Calibrating…'
     sub = <span className="calib-bar"><span style={{ width: `${p * 100}%` }} /></span>
   } else if (w.ttc_min !== null && w.ttc_min <= 0) {
-    main = 'AT LIMIT'
+    tone = 'alarm'
+    main = 'At limit'
     sub = 'now'
   } else if (w.ttc_min !== null) {
+    tone = 'number'
     main = <>{Math.round(w.ttc_min)}<span className="unit">min</span></>
     sub = 'to critical'
   } else {
     tone = 'muted'
-    main = <span className="safe">{w.level === 'NONE' ? 'Safe' : 'No crossing'}</span>
-    sub = 'next 2h+'
+    main = 'Safe · 2h+'
   }
 
   return (
-    <div className={`slot slot-${size} tone-${tone}`}>
-      <div className="slot-main">{main}</div>
-      <div className="slot-sub">{sub}</div>
+    <div className={`slot tone-${tone}`}>
+      <span className="slot-main">{main}</span>
+      {sub && <span className="slot-sub">{sub}</span>}
     </div>
   )
 }
@@ -62,10 +67,12 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
   const recovering = isRecovering(w)
   const tags = riskTags(w)
   // One personal reason, not repeating what the tags already say.
-  const reason = personalReasons(w).find(
-    (r) => !(r.startsWith('Not yet acclimatized') && tags.includes('Not acclimatized'))
-      && !(r.startsWith('Age 45+') && tags.includes('Age 45+')),
-  )
+  const reason = w.level !== 'NONE' && !w.signal_lost
+    ? personalReasons(w).find(
+        (r) => !(r.startsWith('Not yet acclimatized') && tags.includes('Not acclimatized'))
+          && !(r.startsWith('Age 45+') && tags.includes('Age 45+')),
+      )
+    : undefined
   const state = w.signal_lost ? 'lost' : recovering ? 'recovering' : `level-${w.level}`
   const pulse = w.level === 'CRITICAL' && !recovering && !w.signal_lost
 
@@ -73,28 +80,26 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
     <button className={`card ${state} ${pulse ? 'pulse' : ''} ${selected ? 'selected' : ''}`} onClick={onSelect}
       aria-label={`${p.name}, ${w.signal_lost ? 'no signal' : LEVEL_LABEL[w.level]}`}>
       <div className="card-head">
-        <div className="name">{p.name}</div>
-        <div className="card-sub">
-          {w.signal_lost
-            ? <span className="level-chip level-LOST">NO SIGNAL</span>
-            : recovering
-              ? <span className="level-chip level-RECOVERING">RESTING</span>
-              : w.level !== 'NONE' && <span className={`level-chip level-${w.level}`}>{LEVEL_LABEL[w.level]}</span>}
-          <span className="role">{p.role}</span>
-        </div>
+        <span className="name">{p.name}</span>
+        <span className="role">{p.role}</span>
+        {w.signal_lost
+          ? <span className="level-chip level-LOST">NO SIGNAL</span>
+          : recovering
+            ? <span className="level-chip level-RECOVERING">RESTING</span>
+            : w.level !== 'NONE' && <span className={`level-chip level-${w.level}`}>{LEVEL_LABEL[w.level]}</span>}
       </div>
 
       <CountdownSlot w={w} ticks={ticks} />
 
-      <RedlineMeter w={w} recovering={recovering} />
+      <Sparkline w={w} ticks={ticks} />
 
       <div className="card-line">
         Core <b>{fmt(w.core_c, 1)}</b> °C · HR <b>{fmt(w.hr, 0)}</b>
       </div>
-      <div className="card-tags">
-        {tags.map((t) => <span key={t} className="tag">{t}</span>)}
-      </div>
-      <div className="card-reason">{w.level !== 'NONE' && !w.signal_lost ? reason ?? '' : ''}</div>
+      {tags.length > 0 && (
+        <div className="card-tags">{tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+      )}
+      {reason && <div className="card-reason">{reason}</div>}
     </button>
   )
 }

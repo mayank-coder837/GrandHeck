@@ -3,15 +3,9 @@
 
 import type { Level, Tick, WorkerSnapshot } from './types'
 
-export const BASELINE_CORE_C = 37.0          // redline meter: this core temp reads as 0 %
 export const FORECAST_MIN_POINTS = 12        // mirrors backend config, for the calibration bar
 
 export const LEVEL_RANK: Record<Level, number> = { NONE: 0, ADVISORY: 1, WARNING: 2, CRITICAL: 3 }
-
-/** Fraction of the way from baseline to the worker's personal limit (may exceed 1). */
-export function redlineFraction(w: WorkerSnapshot): number {
-  return (w.core_c - BASELINE_CORE_C) / (w.core_limit_c - BASELINE_CORE_C)
-}
 
 export function isOverLimit(w: WorkerSnapshot): boolean {
   return !w.signal_lost && w.core_c >= w.core_limit_c
