@@ -73,15 +73,15 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
     <button className={`card ${state} ${pulse ? 'pulse' : ''} ${selected ? 'selected' : ''}`} onClick={onSelect}
       aria-label={`${p.name}, ${w.signal_lost ? 'no signal' : LEVEL_LABEL[w.level]}`}>
       <div className="card-head">
-        <div className="who">
-          <div className="name">{p.name}</div>
-          <div className="role">{p.role}</div>
+        <div className="name">{p.name}</div>
+        <div className="card-sub">
+          {w.signal_lost
+            ? <span className="level-chip level-LOST">NO SIGNAL</span>
+            : recovering
+              ? <span className="level-chip level-RECOVERING">RESTING</span>
+              : w.level !== 'NONE' && <span className={`level-chip level-${w.level}`}>{LEVEL_LABEL[w.level]}</span>}
+          <span className="role">{p.role}</span>
         </div>
-        {w.signal_lost
-          ? <span className="level-chip level-LOST">NO SIGNAL</span>
-          : recovering
-            ? <span className="level-chip level-RECOVERING">RESTING</span>
-            : w.level !== 'NONE' && <span className={`level-chip level-${w.level}`}>{LEVEL_LABEL[w.level]}</span>}
       </div>
 
       <CountdownSlot w={w} ticks={ticks} />
@@ -94,7 +94,7 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
       <div className="card-tags">
         {tags.map((t) => <span key={t} className="tag">{t}</span>)}
       </div>
-      <div className="card-reason">{reason ?? ''}</div>
+      <div className="card-reason">{w.level !== 'NONE' && !w.signal_lost ? reason ?? '' : ''}</div>
     </button>
   )
 }

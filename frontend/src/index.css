@@ -30,13 +30,13 @@
   --r-sm: 8px;
 
   font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
-  font-size: 16px;
   line-height: 1.35;
   color: var(--text);
   background: var(--bg);
 }
 
 * { box-sizing: border-box; }
+@media (min-width: 2200px) { :root { font-size: 20px; } }
 body { margin: 0; background: var(--bg); min-width: 320px; }
 h2, h3 { margin: 0; }
 h2 { font-size: var(--fs-title); font-weight: 800; }
@@ -126,13 +126,13 @@ button, select, input { font: inherit; color: inherit; }
              background: repeating-linear-gradient(45deg, #111a2e, #111a2e 10px, #152036 10px, #152036 20px); }
 .card.pulse { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.22); } }
-.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s2); min-width: 0; }
-.who { min-width: 0; flex: 1; }
+.card-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .name { font-size: var(--fs-title); font-weight: 700; line-height: 1.2; }
 .role { color: var(--muted); }
-.who .name, .who .role { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-head .name, .card-head .role { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.card-sub { display: flex; align-items: center; gap: var(--s2); min-width: 0; height: 24px; }
 
-.slot { display: flex; flex-direction: column; justify-content: center; min-height: 76px; }
+.slot { display: flex; flex-direction: column; justify-content: flex-end; min-height: 76px; }
 .slot-main { font-size: var(--fs-hero); font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slot-sub { color: var(--muted); font-size: var(--fs-small); min-height: 1.3em; }
 .card.level-ADVISORY .slot.tone-level .slot-main, .focus.level-ADVISORY .slot.tone-level .slot-main { color: var(--advisory); }
@@ -149,7 +149,8 @@ button, select, input { font: inherit; color: inherit; }
 .card-line { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-line b { color: var(--text); }
 .card-tags { display: flex; gap: var(--s2); height: 24px; overflow: hidden; }
-.tag { font-size: var(--fs-small); padding: 2px var(--s2); border-radius: 6px; color: #fde68a; background: #3b2f0c; white-space: nowrap; }
+.tag { font-size: var(--fs-small); padding: 2px var(--s2); border-radius: 6px; color: #fde68a; background: #3b2f0c;
+       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 .card-reason { font-size: var(--fs-small); color: var(--text-2); height: 1.3em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- redline meter ---------- */

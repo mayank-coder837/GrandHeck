@@ -21,24 +21,29 @@ export function useStableRiskOrder(workers: WorkerSnapshot[]): string[] {
 /** FLIP animation: when cards change position, slide them from where they were. */
 function useFlip(keys: string[], container: React.RefObject<HTMLDivElement | null>) {
   const last = useRef<Map<string, DOMRect>>(new Map())
+  const lastKeys = useRef('')
+  // Runs after every render so positions are never stale (e.g. after a window resize);
+  // only animates when the order itself changed.
   useLayoutEffect(() => {
     const el = container.current
     if (!el) return
+    const orderChanged = lastKeys.current !== '' && lastKeys.current !== keys.join(',')
     const next = new Map<string, DOMRect>()
     el.querySelectorAll<HTMLElement>('[data-flip]').forEach((node) => {
       const key = node.dataset.flip!
       const rect = node.getBoundingClientRect()
       next.set(key, rect)
       const prev = last.current.get(key)
-      if (prev && (prev.left !== rect.left || prev.top !== rect.top)) {
+      if (orderChanged && prev && (prev.left !== rect.left || prev.top !== rect.top)) {
         node.animate(
           [{ transform: `translate(${prev.left - rect.left}px, ${prev.top - rect.top}px)` }, { transform: 'none' }],
-          { duration: 450, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+          { duration: 350, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
         )
       }
     })
     last.current = next
-  }, [keys.join(','), container])
+    lastKeys.current = keys.join(',')
+  })
 }
 
 export function CrewGrid({ order, children }: { order: string[]; children: (id: string) => ReactNode }) {

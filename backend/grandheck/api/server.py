@@ -54,6 +54,7 @@ async def control(c: Control) -> dict[str, Any]:
         raise HTTPException(404, f"unknown worker {c.worker_id}")
     if c.action == "reset":
         runner.reset(c.weather or "normal", c.start_hour or 7.0)
+        runner.paused = False
         await runner.broadcast(runner.snapshot_message())
     elif c.action == "pause":
         runner.paused = True
