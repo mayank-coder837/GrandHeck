@@ -52,12 +52,11 @@ function domainWithPadding(values: number[], pad: number, step = 0.1): [number, 
 }
 
 export function WorkerDetail({
-  worker, ticks, alerts, utcOffsetH: _utc, acked, showTruth, onToggleTruth, onAck, onRest, onClose, onPrev, onNext,
+  worker, ticks, alerts, acked, showTruth, onToggleTruth, onAck, onRest, onClose, onPrev, onNext,
 }: {
   worker: WorkerSnapshot
   ticks: Tick[]
   alerts: Alert[]
-  utcOffsetH: number
   acked: boolean
   showTruth: boolean
   onToggleTruth: () => void
@@ -82,11 +81,10 @@ export function WorkerDetail({
       if (e.key === 'Escape') onClose()
       else if (e.key === 'ArrowLeft') onPrev()
       else if (e.key === 'ArrowRight') onNext()
-      else if (e.key === 'g' || e.key === 'G') onToggleTruth()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, onPrev, onNext, onToggleTruth])
+  }, [onClose, onPrev, onNext])
 
   // ----- data -----
   const history = useMemo(() => ticks.filter((t) => t.minute >= start).map((t) => {

@@ -64,11 +64,17 @@ class DemoRunner:
         self.run_no += 1
         self.run_id = f"run{self.run_no}"
         length = int((C.SIM_SHIFT_START_HOUR * 60 + C.SIM_SHIFT_LENGTH_MIN) - start_hour * 60)
-        self.sim = Simulator(weather, seed=seed, start_hour=start_hour, shift_length_min=max(60, length))
+        warmup = C.SIM_WARMUP_MIN
+        # Start the simulation a little before the shift clock and run that part silently,
+        # so the estimator and forecaster are already calibrated when the dashboard opens.
+        self.sim = Simulator(weather, seed=seed, start_hour=start_hour - warmup / 60.0,
+                             shift_length_min=max(60, length) + warmup)
         self.bus = Bus()
         self.gateway = Gateway(self.sim.profiles, self.bus)
         self.ticks, self.alerts = [], []
         self.truth: list[dict[str, Any]] = []
+        for _ in range(warmup):
+            self.step_once()
 
     def state(self) -> dict[str, Any]:
         return {

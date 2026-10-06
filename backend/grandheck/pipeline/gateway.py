@@ -55,6 +55,16 @@ class SiteState:
     heat_index_c: float | None = None
     wbgt_history: deque = field(default_factory=lambda: deque(maxlen=C.HISTORY_MINUTES))
 
+    def trend(self) -> float | None:
+        return _trend_per_hour(list(self.wbgt_history), 30)
+
+    def reported_trend(self) -> float | None:
+        """Trend as shown to people: withheld until there is enough history to mean anything."""
+        h = self.wbgt_history
+        if not h or h[-1][0] - h[0][0] < C.WBGT_TREND_MIN_HISTORY_MIN:
+            return None
+        return self.trend()
+
     def snapshot(self, minute: float) -> dict[str, Any]:
         stale = self.last_env_minute is None or minute - self.last_env_minute >= C.DROPOUT_TIMEOUT_MIN
         e = self.env
@@ -65,7 +75,7 @@ class SiteState:
             "wind_ms": e.wind_ms if e else None,
             "wbgt_c": self.wbgt_c,
             "wbgt_method": self.wbgt_method,
-            "wbgt_trend_c_per_h": _trend_per_hour(list(self.wbgt_history), 30),
+            "wbgt_trend_c_per_h": self.reported_trend(),
             "heat_index_c": self.heat_index_c,
             "heat_index_band": hi.heat_index_band(self.heat_index_c) if self.heat_index_c is not None else None,
             "categories": {w: limits.classify_environment(self.wbgt_c, w) for w in ("light", "moderate", "heavy")}
@@ -261,7 +271,7 @@ class Gateway:
                 core_est=ws.filter.ct, core_slope_c_per_h=fc.core_slope_c_per_h, hr=ws.hr,
                 hr_rise_15=ws.hr_rise_15min(), psi=ws.psi,
                 wbgt_excess=None if self.site.wbgt_c is None else self.site.wbgt_c - ws.wbgt_limit_c,
-                wbgt_trend_c_per_h=site["wbgt_trend_c_per_h"], working=not ws.resting,
+                wbgt_trend_c_per_h=self.site.trend(), working=not ws.resting,
                 minutes_since_rest=ws.minutes_since_rest, acclimatized=ws.p.acclimatized,
                 workload=ws.workload, older=ws.older, data_minutes=ws.observed_minutes)
             if self.model is not None and not fc.stale and not ws.signal_lost:

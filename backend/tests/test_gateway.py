@@ -99,3 +99,20 @@ def test_spike_drives_worker_to_warning_before_true_critical():
             crossed_at = minute
     assert crossed_at is not None and warned_at is not None
     assert warned_at < crossed_at
+
+
+def test_wbgt_trend_is_withheld_until_enough_history():
+    sim, bus, gw = setup()
+    ticks = advance(sim, bus, gw, C.WBGT_TREND_MIN_HISTORY_MIN + 2)
+    assert all(t["site"]["wbgt_trend_c_per_h"] is None for t in ticks[:C.WBGT_TREND_MIN_HISTORY_MIN])
+    assert ticks[-1]["site"]["wbgt_trend_c_per_h"] is not None
+
+
+def test_demo_reset_warms_up_so_forecasts_are_ready():
+    from grandheck.api.runner import DemoRunner
+    r = DemoRunner()
+    r.reset("normal", 7.0)
+    last = r.ticks[-1]
+    assert last["ts"][11:16] == "06:59"          # the first streamed minute is 07:00
+    assert len(r.ticks) == C.SIM_WARMUP_MIN
+    assert not any(w["forecast_stale"] for w in last["workers"])

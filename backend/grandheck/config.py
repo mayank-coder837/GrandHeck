@@ -239,6 +239,10 @@ ACTIONS = {
 SIM_SHIFT_START_HOUR = 7
 SIM_SHIFT_LENGTH_MIN = 540          # 07:00 - 16:00
 SIM_DEFAULT_SPEED = 1.0             # simulated minutes per real second
+SIM_WARMUP_MIN = 15                 # DESIGN: on a new shift the demo pre-simulates this many
+                                    # minutes before the shift clock (>= FORECAST_MIN_POINTS),
+                                    # so the dashboard opens with forecasts, not "calibrating"
+WBGT_TREND_MIN_HISTORY_MIN = 15     # DESIGN: the reported WBGT trend needs this much history
 
 
 def todo_items() -> list[str]:
