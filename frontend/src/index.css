@@ -213,3 +213,16 @@ small { font-size: 0.6em; color: var(--muted); margin-left: 2px; }
 .banner.worst-WARNING .banner-headline { color: var(--warning); }
 .banner.worst-CRITICAL { border-left-color: var(--critical); }
 .banner.worst-CRITICAL .banner-headline { color: #fca5a5; }
+
+/* ---------- full-height layout + 4x2 grid ---------- */
+.app { height: 100vh; min-height: 0; }
+.main { min-height: 0; }
+.crew { display: flex; flex-direction: column; min-height: 0; }
+.grid { flex: 1; min-height: 0; display: grid; gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(220px, auto); }
+.grid-cell { display: flex; min-width: 0; min-height: 0; }
+.grid-cell > .card { flex: 1; min-width: 0; }
+@media (min-width: 1280px) {
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); grid-auto-rows: unset; }
+}
+@media (max-width: 1279px) { .app { height: auto; min-height: 100vh; } }

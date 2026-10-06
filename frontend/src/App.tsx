@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AlertFeed } from './components/AlertFeed'
 import { ControlPanel } from './components/ControlPanel'
 import { CrewBanner } from './components/CrewBanner'
+import { CrewGrid, useStableRiskOrder } from './components/CrewGrid'
 import { TopBar } from './components/TopBar'
 import { WorkerCard } from './components/WorkerCard'
 import { WorkerDetail } from './components/WorkerDetail'
@@ -13,6 +14,8 @@ export default function App() {
   const last = ticks[ticks.length - 1]
   const workers = last?.workers ?? []
   const selectedWorker = workers.find((w) => w.worker_id === selected)
+  const order = useStableRiskOrder(workers)
+  const byId = Object.fromEntries(workers.map((w) => [w.worker_id, w]))
 
   return (
     <div className="app">
@@ -22,13 +25,13 @@ export default function App() {
       <main className="main">
         <section className="crew">
           <CrewBanner workers={workers} site={last?.site} />
-          <div className="grid">
-            {workers.map((w) => (
-              <WorkerCard key={w.worker_id} w={w} horizon={state?.thresholds.horizon_min ?? 120}
-                selected={w.worker_id === selected}
-                onSelect={() => setSelected(w.worker_id === selected ? null : w.worker_id)} />
-            ))}
-          </div>
+          <CrewGrid order={order}>
+            {(id) => byId[id] && (
+              <WorkerCard w={byId[id]} horizon={state?.thresholds.horizon_min ?? 120}
+                selected={id === selected}
+                onSelect={() => setSelected(id === selected ? null : id)} />
+            )}
+          </CrewGrid>
           {selectedWorker && state && (
             <WorkerDetail worker={selectedWorker} ticks={ticks} utcOffsetH={state.site.utc_offset_h}
               onClose={() => setSelected(null)} />
