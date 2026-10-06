@@ -7,7 +7,7 @@
   "ectemp_rmse_c": 0.23597430784529896,
   "systems": {
     "ours": {
-      "label": "GrandHeck v2 (Warning or higher)",
+      "label": "Redline v2 (Warning or higher)",
       "detected": 456,
       "detection_rate": 0.9402061855670103,
       "median_lead_min": 50.5,
@@ -19,7 +19,7 @@
       "quiet_workers_alarmed_pct": 15.336322869955158
     },
     "ours_advisory": {
-      "label": "GrandHeck v2 (Advisory or higher)",
+      "label": "Redline v2 (Advisory or higher)",
       "detected": 484,
       "detection_rate": 0.9979381443298969,
       "median_lead_min": 60.0,
@@ -31,7 +31,7 @@
       "quiet_workers_alarmed_pct": 41.70403587443946
     },
     "ours_v1": {
-      "label": "GrandHeck v1, trend only (Warning or higher)",
+      "label": "Redline v1, trend only (Warning or higher)",
       "detected": 319,
       "detection_rate": 0.6577319587628866,
       "median_lead_min": 52,

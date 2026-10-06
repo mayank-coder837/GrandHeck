@@ -252,21 +252,31 @@ Worker profiles (`WorkerProfile` in `schema.py`) hold: `worker_id`, `name`, `rol
 
 ## 3-minute demo script
 
-**Setup before going on stage:** run `python run.py` and maximise the browser. The simulator uses a fixed seed, so this sequence plays out the same way every time.
+**Setup before going on stage:** run `python run.py` and maximise the browser. The simulator uses a fixed seed, so this sequence plays out the same way every time. Demo controls sit behind the small **Demo** button (bottom right), and everything also has a keyboard shortcut. Press **?** on stage if you forget one.
 
-| Time | Click | What the audience sees / what you say |
+| Key | Action | Key | Action |
+|---|---|---|---|
+| **N** | New shift: normal hot day | **B** | New shift: heat building |
+| **H** | Heat surge now | **S** | Heavy work, no rest (selected worker, or first non-critical) |
+| **D** | Sensor dropout (same targeting) | **R** | Send selected worker to rest |
+| **Space** | Pause / resume | **1–5** | Speed 0.5× / 1× / 2× / 5× / 10× |
+| **G** | Compare with true core temp (detail view) | **← →** / **Esc** | Previous / next worker, close detail |
+
+A new shift silently pre-simulates 15 minutes, so the dashboard opens with live countdowns instead of "calibrating".
+
+| Time | Do | What the audience sees / what you say |
 |---|---|---|
-| 0:00 | **New shift → Normal hot day** (from 07:00), speed **2×** | "A desert site at 7 a.m. with eight workers. Each wearable sends heart rate and motion; the weather station sends temperature, humidity, sun and wind." Point at the top bar: WBGT (Liljegren) vs. heat index, and the category for moderate work. |
-| 0:20 | Wait until ~07:13 | **Daniel Okafor** (new this week, heavy labour) turns **WARNING**, with a countdown. "Nobody here feels unwell yet. We're warning about Daniel specifically, not the whole site." |
-| 0:35 | **Click Daniel's card** | Drill-down: estimated core temperature (blue), forecast (orange dashed) and risk edge (dotted) heading for his **38.0 °C** limit (lower, because he's not acclimatized). Read the **Why** line and the **Do** line. |
-| 0:55 | Tick **show simulator ground truth** | The grey line is his *true* core temperature, which the system never sees. "We warned at 07:13. His real core temperature crosses the limit at about 08:08. That's 55 minutes of warning." Let it run to ~08:05 at **5×** to show the crossing. If asked why the orange forecast starts above the blue line: the heart-rate estimate lags a fast-rising core temperature, the model corrects for that lag, and the grey truth line confirms it. |
-| 1:20 | Speed **2×**; **Send to rest** (Daniel selected) | Daniel's core temperature turns down; after a few minutes the alert eases. It doesn't flap on and off (hysteresis). |
-| 1:40 | Select **Ravi Menon** → **Sensor dropout** | Ravi's card goes to hatched **NO SIGNAL**, a SIGNAL LOST alert says "check on the worker in person", and the WBGT tile shows **solar held**. "Missing data is shown, never treated as safe." |
-| 2:00 | **Heat surge now**, speed **5×** | A humid sea breeze arrives and WBGT climbs. **Li Wei** (new electrician) goes to **WARNING** around 09:04, before his true crossing around 09:13. Older riggers get Advisories at different times. "Same site, same heat, different people, different times." |
-| 2:30 | Point at the alert feed | Each alert is one line of **why** and one line of **what to do**. Advisories are hidden by default so the feed stays readable. |
+| 0:00 | **N**, then **3** (2×) | "A desert site at 7 a.m. with eight workers." Point at the banner (how many are at risk, and the site heat in one line) and the WBGT tile. Countdowns show time to critical strain *if nothing changes*. |
+| 0:15 | Wait until ~07:04 | **Daniel Okafor** (new this week, heavy labour) moves to the top-left as **WARNING**, with his countdown and redline meter. "Nobody feels unwell yet. We're warning about Daniel specifically, not the whole site." |
+| 0:30 | **Click Daniel's card** | The focus view slides in: estimated core temperature (blue), forecast (orange) with its likely range, heading for his red **Danger 38.0 °C** line (lower, because he's not acclimatized). Read the action line and the **Why** line. |
+| 0:50 | Press **G** | The grey line is his *true* core temperature, which the system never sees. "We warned at 07:04. His real core temperature crosses the limit at about 07:26." If asked about the note under the chart: the heart-rate estimate lags a fast-rising core temperature, and the model corrects for that lag. |
+| 1:15 | **Esc**, then **Send to rest** on Daniel's entry in **Action needed** | His card turns teal, **Recovering**, and stops pulsing. The alert doesn't flap on and off. |
+| 1:35 | Click **Ravi Menon**, press **D**, then **Esc** | Ravi's card goes to hatched **NO SIGNAL · last seen …**, Action needed says "check on the worker in person", and the WBGT tile shows ⚠ (solar sensor offline, last reading held). "Missing data is shown, never treated as safe." |
+| 1:55 | **H**, then **4** (5×) | A humid sea breeze arrives and WBGT climbs. **Li Wei** (new electrician) is warned around 08:53, before his true crossing around 09:12; the older riggers follow later. "Same site, same heat, different people, different times." |
+| 2:30 | Point at **Action needed** | One entry per worker: a one-line action, **Send to rest**, **Acknowledge**, and the full protocol behind **Details**. |
 | 2:40 | Show `docs/results/results_chart.png` | "Over 200 simulated shifts we warned before 94% of critical events, a median 50 minutes ahead, with 5.6× fewer false alarms than a WBGT alarm. And it all runs offline on a box at the site." |
 
-**Fallback:** if anything misbehaves, click **New shift → Normal hot day** to restart from a known state. **Pause** and **+1 min** let you step through slowly while you talk.
+**Fallback:** press **N** to restart from a known state. **Space** pauses so you can talk; **+1 min** in the Demo drawer steps one minute at a time.
 
 ---
 
