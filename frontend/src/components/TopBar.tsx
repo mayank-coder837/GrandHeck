@@ -10,7 +10,7 @@ export function TopBar({ tick, state, connected }: { tick?: Tick; state: RunStat
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="brand-name">GrandHeck</div>
+        <div className="brand-name">Redline</div>
         <div className="brand-sub">Heat-strain early warning · {state?.site.name ?? '…'}</div>
       </div>
 

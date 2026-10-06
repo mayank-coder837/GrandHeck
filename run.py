@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-One command to run the whole GrandHeck demo:
+One command to run the whole Redline demo:
 
     python run.py                 set up (first run only), build the dashboard, start the gateway
     python run.py --port 9000     use another port
@@ -93,7 +93,7 @@ def main() -> None:
 
     ensure_frontend_built()
     url = f"http://{'localhost' if args.host in ('127.0.0.1', '0.0.0.0') else args.host}:{args.port}"
-    say(f"GrandHeck gateway starting at {url}  (Ctrl+C to stop)")
+    say(f"Redline gateway starting at {url}  (Ctrl+C to stop)")
     if not args.no_browser:
         threading.Thread(target=lambda: (time.sleep(2.0), webbrowser.open(url)), daemon=True).start()
     try:

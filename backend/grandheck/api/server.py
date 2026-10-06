@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="GrandHeck heat-strain gateway", lifespan=lifespan)
+app = FastAPI(title="Redline heat-strain gateway", lifespan=lifespan)
 
 
 class Control(BaseModel):

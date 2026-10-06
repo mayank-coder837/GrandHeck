@@ -51,9 +51,9 @@ EVAL_SEED_BASE = 1000
 OUT_DIR = Path(__file__).resolve().parents[2] / "docs" / "results"
 
 SYSTEMS = {
-    "ours": "GrandHeck v2 (Warning or higher)",
-    "ours_advisory": "GrandHeck v2 (Advisory or higher)",
-    "ours_v1": "GrandHeck v1, trend only (Warning or higher)",
+    "ours": "Redline v2 (Warning or higher)",
+    "ours_advisory": "Redline v2 (Advisory or higher)",
+    "ours_v1": "Redline v1, trend only (Warning or higher)",
     "wbgt": f"Naive WBGT alarm (≥ {WBGT_FIXED_THRESHOLD_C} °C)",
     "hr": "Naive heart-rate alarm (> 180 − age, sustained)",
 }
@@ -237,7 +237,7 @@ def plot(summary: dict) -> None:
     import matplotlib.pyplot as plt
 
     order = ["ours", "ours_v1", "wbgt", "hr"]               # the Advisory variant stays in the table
-    names = {"ours": "GrandHeck (v2)", "ours_v1": "GrandHeck v1\n(trend only)",
+    names = {"ours": "Redline (v2)", "ours_v1": "Redline v1\n(trend only)",
              "wbgt": f"Naive WBGT alarm\n(≥ {summary['wbgt_fixed_threshold_c']} °C)",
              "hr": "Naive heart-rate\nalarm (180 − age)"}
     colors = ["#0284c7", "#7dd3fc", "#9ca3af", "#9ca3af"]

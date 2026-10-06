@@ -1,12 +1,12 @@
-# GrandHeck: a personal heat-strain forecaster
+# Redline: heat-strain early warning
 
 > **Standard alarms tell you it's hot. We tell you which worker will be in danger, and when, before they feel it.**
 
-GrandHeck watches a crew of outdoor workers at a remote desert site. For **each worker** it estimates core body temperature from a wearable heart-rate stream. It then forecasts **how many minutes remain until they reach dangerous heat strain if they keep working as they are**, and it warns them and their supervisor *before* that happens. Every alert says why it fired and what to do. The alert logic runs on a site gateway with **no internet connection**.
+Redline watches a crew of outdoor workers at a remote desert site. For **each worker** it estimates core body temperature from a wearable heart-rate stream. It then forecasts **how many minutes remain until they reach dangerous heat strain if they keep working as they are**, and it warns them and their supervisor *before* that happens. Every alert says why it fired and what to do. The alert logic runs on a site gateway with **no internet connection**.
 
 ![Evaluation results](docs/results/results_chart.png)
 
-On 200 held-out simulated shifts (1,600 worker-shifts, 485 critical events), GrandHeck warned before **94%** of critical heat-strain events, a median **50 minutes** ahead. It raised **5.6× fewer false alarms** than a fixed WBGT alarm (50 vs. 281 per 100 worker-shifts). [Details and caveats are below.](#evaluation-results)
+On 200 held-out simulated shifts (1,600 worker-shifts, 485 critical events), Redline warned before **94%** of critical heat-strain events, a median **50 minutes** ahead. It raised **5.6× fewer false alarms** than a fixed WBGT alarm (50 vs. 281 per 100 worker-shifts). [Details and caveats are below.](#evaluation-results)
 
 ---
 
@@ -32,7 +32,7 @@ In deserts, offshore and in disaster zones, heat conditions change fast and medi
 - **Site-wide heat alarms** (WBGT flags, heat index) say *the site* is hot. They fire for everyone at once, all afternoon, so crews learn to ignore them. They don't know that the new hire on heavy work is in far more danger than the acclimatized surveyor.
 - **Personal heart-rate limits** fire too late or never. Heart rate alone is a poor guide to core temperature.
 
-The challenge pipeline is **Monitor the environment → Detect stress → Assess human exposure → Issue an early warning**. GrandHeck implements every stage, and puts most of its care into exposure assessment and forecasting.
+The challenge pipeline is **Monitor the environment → Detect stress → Assess human exposure → Issue an early warning**. Redline implements every stage, and puts most of its care into exposure assessment and forecasting.
 
 ---
 
@@ -288,9 +288,9 @@ Worker profiles (`WorkerProfile` in `schema.py`) hold: `worker_id`, `name`, `rol
 
 | System | Warned in time | Median lead (min) | Missed | False alarms / 100 worker-shifts | Alarm precision | Never-in-danger workers alarmed |
 |---|---|---|---|---|---|---|
-| **GrandHeck v2 (Warning+)** | **456 / 485 (94%)** | **50** | **29** | **50.1** | **34%** | **15%** |
-| GrandHeck v2 (Advisory+) | 484 (100%) | 60 | 1 | 166.1 | 10% | 42% |
-| GrandHeck v1, trend only | 319 (66%) | 52 | 166 | 48.9 | 32% | 15% |
+| **Redline v2 (Warning+)** | **456 / 485 (94%)** | **50** | **29** | **50.1** | **34%** | **15%** |
+| Redline v2 (Advisory+) | 484 (100%) | 60 | 1 | 166.1 | 10% | 42% |
+| Redline v1, trend only | 319 (66%) | 52 | 166 | 48.9 | 32% | 15% |
 | Naive WBGT alarm (≥ 28.2 °C) | 402 (83%) | 60 | 83 | 281.1 | 6% | 100% |
 | Naive heart-rate alarm | 91 (19%) | 57 | 394 | 66.5 | 10% | 15% |
 
@@ -299,7 +299,7 @@ ECTemp's core-temperature error against the hidden truth is **0.24 °C RMSE**, i
 **How to read this**
 
 - **The WBGT alarm's high lead time is an artefact.** It switches on mid-morning for everyone and stays on, so it's "early" for the people who get hot and wrong for everyone else. It alarmed 100% of workers who were never in danger.
-- **GrandHeck matches or beats its detection** (94% vs. 83%) while alarming only 15% of those workers. It also names the worker and the time.
+- **Redline matches or beats its detection** (94% vs. 83%) while alarming only 15% of those workers. It also names the worker and the time.
 - **The HR-only alarm mostly fires too late or never.** Heart rate alone is a poor proxy for core temperature.
 - **v1 → v2 is what forecasting from the environment and the worker's profile buys.** Detection rises from 66% to 94% at about the same false-alarm rate.
 

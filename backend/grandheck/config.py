@@ -1,5 +1,5 @@
 """
-Every threshold and constant used by GrandHeck lives in this file.
+Every threshold and constant used by Redline lives in this file.
 
 Rules:
   * Each value carries a comment citing its source.
