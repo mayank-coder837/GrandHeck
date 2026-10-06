@@ -283,3 +283,14 @@ button, select, input { font: inherit; color: inherit; }
 .sheet dt { width: 64px; }
 .sheet dd { margin: 0; }
 kbd { background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 1px var(--s2); font: inherit; font-weight: 700; }
+
+/* ---------- short screens (e.g. 1366x768 projectors): compact cards so nothing clips ---------- */
+@media (max-height: 860px) and (min-width: 1280px) {
+  :root { --fs-hero: 2.25rem; --fs-title: 1.2rem; }
+  .card { gap: 6px; padding: var(--s2) var(--s3); }
+  .slot { min-height: 52px; }
+  .main { padding: var(--s3); gap: var(--s3); }
+  .crew { gap: var(--s2); }
+  .banner { padding: var(--s2) var(--s4); }
+  .topbar { padding: var(--s2) var(--s4); }
+}
