@@ -27,7 +27,7 @@ export default function App() {
           <CrewBanner workers={workers} site={last?.site} />
           <CrewGrid order={order}>
             {(id) => byId[id] && (
-              <WorkerCard w={byId[id]} horizon={state?.thresholds.horizon_min ?? 120}
+              <WorkerCard w={byId[id]} ticks={ticks}
                 selected={id === selected}
                 onSelect={() => setSelected(id === selected ? null : id)} />
             )}
