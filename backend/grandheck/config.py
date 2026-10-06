@@ -157,6 +157,9 @@ REST_MIN_DURATION_MIN = 10          # DESIGN: a rest bout must last this long to
                                     # "time since rest". NIOSH work/rest regimens use
                                     # >=15 min breaks per hour (see [NIOSH] Ch. 8).
 DROPOUT_TIMEOUT_MIN = 3             # DESIGN: no vitals for this long -> SIGNAL LOST
+SOLAR_CARRY_FORWARD_MAX_MIN = 30    # DESIGN: if the pyranometer drops out, reuse the last
+                                    # good solar reading this long (flagged in the UI)
+                                    # before falling back to the shade-only WBGT formula
 HISTORY_MINUTES = 240               # DESIGN: per-worker history kept for charts
 
 # ---------------------------------------------------------------------------

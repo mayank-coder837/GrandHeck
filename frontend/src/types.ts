@@ -40,10 +40,12 @@ export interface WorkerSnapshot {
   exposure_total_min: number
   exposure_continuous_min: number
   ttc_min: number | null
+  ttc_expected_min: number | null
   ttc_driver: 'core' | 'psi' | null
   forecast_stale: boolean
   core_slope_c_per_h: number | null
   forecast_line: [number, number][]
+  risk_line: [number, number][]
   reasons: string[]
   point: HistoryPoint
 }
@@ -54,7 +56,7 @@ export interface SiteSnapshot {
   solar_wm2: number | null
   wind_ms: number | null
   wbgt_c: number | null
-  wbgt_method: 'liljegren' | 'bom_shade' | null
+  wbgt_method: 'liljegren' | 'liljegren_held_solar' | 'bom_shade' | null
   wbgt_trend_c_per_h: number | null
   heat_index_c: number | null
   heat_index_band: string | null
@@ -70,6 +72,7 @@ export interface Alert {
   level: Level
   kind: 'escalated' | 'renotify' | 'resolved' | 'signal_lost' | 'signal_restored'
   ttc_min: number | null
+  ttc_expected_min: number | null
   reasons: string[]
   action: string
 }
@@ -91,6 +94,7 @@ export interface RunState {
   speeds: number[]
   paused: boolean
   finished: boolean
+  forecaster: 'v1' | 'v2'
   profiles: Profile[]
   site: { id: string; name: string; lat: number; lon: number; utc_offset_h: number }
   thresholds: {

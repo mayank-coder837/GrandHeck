@@ -22,6 +22,7 @@ interface Row {
   core?: number | null
   truth?: number | null
   forecast?: number | null
+  risk?: number | null
   hr?: number | null
   psi?: number | null
   wbgt?: number | null
@@ -50,10 +51,15 @@ export function WorkerDetail({ worker, ticks, utcOffsetH, onClose }: {
       }
     })
     if (last && !worker.forecast_stale && !worker.signal_lost) {
-      worker.forecast_line.forEach(([k, v]) => {
-        if (k === 0) out[out.length - 1].forecast = v
-        else out.push({ minute: last.minute + k, forecast: v })
-      })
+      const future = new Map<number, Row>()
+      const at = (k: number) => {
+        if (k === 0) return out[out.length - 1]
+        if (!future.has(k)) future.set(k, { minute: last.minute + k })
+        return future.get(k)!
+      }
+      worker.forecast_line.forEach(([k, v]) => { at(k).forecast = v })
+      worker.risk_line.forEach(([k, v]) => { at(k).risk = v })
+      out.push(...[...future.values()].sort((a, b) => a.minute - b.minute))
     }
     return out
   }, [ticks, id, worker, last])
@@ -80,7 +86,14 @@ export function WorkerDetail({ worker, ticks, utcOffsetH, onClose }: {
         </div>
         <div className="detail-kpis">
           <div><div className="label">Status</div><div className={`level-chip level-${worker.level}`}>{LEVEL_LABEL[worker.level]}</div></div>
-          <div><div className="label">Time to critical</div><div className="kpi">{worker.signal_lost ? 'no signal' : worker.ttc_min === null ? '> 120' : Math.round(worker.ttc_min)}<small> min</small></div></div>
+          <div>
+            <div className="label">Time to critical · earliest likely</div>
+            <div className="kpi">{worker.signal_lost ? 'no signal' : worker.ttc_min === null ? '> 120' : Math.round(worker.ttc_min)}<small> min</small></div>
+          </div>
+          <div>
+            <div className="label">Expected</div>
+            <div className="kpi">{worker.signal_lost || worker.ttc_expected_min === null ? '—' : Math.round(worker.ttc_expected_min)}<small> min</small></div>
+          </div>
           <div><div className="label">Core trend</div><div className="kpi">{fmt(worker.core_slope_c_per_h, 1)}<small> °C/h</small></div></div>
           <div><div className="label">Above WBGT limit</div><div className="kpi">{worker.exposure_total_min}<small> min</small></div></div>
         </div>
@@ -111,6 +124,10 @@ export function WorkerDetail({ worker, ticks, utcOffsetH, onClose }: {
               <ReferenceLine x={last.minute} stroke="#475569" />
               <Line dataKey="core" name="Core (est.)" stroke={C.core} strokeWidth={3} dot={false} isAnimationActive={false} connectNulls={false} />
               <Line dataKey="forecast" name="Forecast" stroke={C.forecast} strokeWidth={3} strokeDasharray="8 5" dot={false} isAnimationActive={false} />
+              {worker.risk_line.length > 0 && (
+                <Line dataKey="risk" name="Risk edge (warns when it hits the limit)" stroke={C.forecast} strokeWidth={1.5}
+                  strokeDasharray="2 4" dot={false} isAnimationActive={false} />
+              )}
               {showTruth && <Line dataKey="truth" name="Ground truth (sim)" stroke={C.truth} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
               <Legend />
             </LineChart>

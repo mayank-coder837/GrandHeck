@@ -2,9 +2,9 @@ from grandheck import config as C
 from grandheck.pipeline.alerts import AlertInputs, AlertStateMachine, raw_level
 
 
-def inp(ttc=None, at=False, exposure=0, lost=False, extra=0.0):
-    return AlertInputs(ttc_min=ttc, at_threshold=at, exposure_minutes=exposure, signal_lost=lost,
-                       extra_lead_min=extra)
+def inp(ttc=None, at=False, exposure=0, lost=False, extra=0.0, expected="same"):
+    return AlertInputs(ttc_min=ttc, ttc_expected_min=ttc if expected == "same" else expected,
+                       at_threshold=at, exposure_minutes=exposure, signal_lost=lost, extra_lead_min=extra)
 
 
 def run(sm, inputs):
@@ -21,6 +21,12 @@ def test_raw_level_tiers():
     assert raw_level(inp(C.ALERT_TTC_CRITICAL_MIN - 1)) == 3
     assert raw_level(inp(None, at=True)) == 3
     assert raw_level(inp(None, exposure=C.ALERT_EXPOSURE_ADVISORY_MIN)) == 1
+
+
+def test_critical_needs_the_central_forecast_not_just_the_risk_edge():
+    # Risk edge says "could cross in 3 min", central forecast says 25 min: that is a Warning, not Critical.
+    assert raw_level(inp(3, expected=25)) == 2
+    assert raw_level(inp(3, expected=4)) == 3
 
 
 def test_older_worker_extra_lead_warns_earlier():

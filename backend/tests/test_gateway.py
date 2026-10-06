@@ -47,13 +47,22 @@ def test_sensor_dropout_is_flagged_and_recovers():
     assert w2["signal_lost"]
     alerts = [a for t in ticks for a in t["alerts"] if a["worker_id"] == "W2"]
     assert [a["kind"] for a in alerts].count("signal_lost") == 1
-    # The weather station lost its solar sensor: WBGT falls back and says so.
-    assert ticks[2]["site"]["wbgt_method"] == "bom_shade"
+    # The weather station lost its solar sensor: the last good reading is held, and flagged.
+    assert ticks[2]["site"]["wbgt_method"] == "liljegren_held_solar"
     assert ticks[-1]["site"]["wbgt_method"] == "liljegren"
     later = advance(sim, bus, gw, 2)
     w2 = next(w for w in later[-1]["workers"] if w["worker_id"] == "W2")
     assert not w2["signal_lost"]
     assert any(a["kind"] == "signal_restored" for t in later for a in t["alerts"])
+
+
+def test_long_solar_outage_falls_back_to_shade_formula():
+    sim, bus, gw = setup()
+    advance(sim, bus, gw, 10)
+    sim.trigger_dropout("W1", minutes=1, solar_minutes=C.SOLAR_CARRY_FORWARD_MAX_MIN + 5)
+    ticks = advance(sim, bus, gw, C.SOLAR_CARRY_FORWARD_MAX_MIN + 3)
+    assert ticks[0]["site"]["wbgt_method"] == "liljegren_held_solar"
+    assert ticks[-1]["site"]["wbgt_method"] == "bom_shade"
 
 
 def test_dropout_gap_is_not_filled_in_history():

@@ -186,6 +186,7 @@ class Gateway:
         self.site = SiteState()
         self.workers = {p.worker_id: WorkerState(p) for p in profiles}
         self._pending_vitals: dict[str, VitalsReading] = {}
+        self._last_solar: tuple[float, float] | None = None     # (minute, W/m2) last good reading
         self._start: datetime | None = None
         self.rejected_messages = 0
         bus.subscribe(env_topic(site_id), self._on_env)
@@ -220,9 +221,15 @@ class Gateway:
         # DETECT
         e = self.site.env
         if e is not None and e.air_temp_c is not None and e.rh_pct is not None:
-            w = estimate_wbgt(e.air_temp_c, e.rh_pct, e.wind_ms, e.solar_wm2, e.ts,
+            solar, held = e.solar_wm2, False
+            if solar is not None:
+                self._last_solar = (minute, solar)
+            elif self._last_solar and minute - self._last_solar[0] <= C.SOLAR_CARRY_FORWARD_MAX_MIN:
+                solar, held = self._last_solar[1], True        # short pyranometer gap: hold last value
+            w = estimate_wbgt(e.air_temp_c, e.rh_pct, e.wind_ms, solar, e.ts,
                               self.lat, self.lon, e.pressure_hpa)
-            self.site.wbgt_c, self.site.wbgt_method = w.wbgt_c, w.method
+            self.site.wbgt_c = w.wbgt_c
+            self.site.wbgt_method = "liljegren_held_solar" if held else w.method
             self.site.heat_index_c = hi.heat_index_c(e.air_temp_c, e.rh_pct)
             self.site.wbgt_history.append((minute, w.wbgt_c))
         site = self.site.snapshot(minute)
@@ -244,13 +251,14 @@ class Gateway:
             if self.model is not None and not fc.stale and not ws.signal_lost:
                 path = self.model.predict_path(ws.features, ws.filter.ct)
                 risk = self.model.risk_path(path, self.risk_z)
-                fc = combine_with_model(fc, path, ws.core_limit_c, time_to_limit(risk, ws.core_limit_c))
+                fc = combine_with_model(fc, path, ws.core_limit_c, time_to_limit(risk, ws.core_limit_c), risk,
+                                        ttc_core_expected=time_to_limit(path, ws.core_limit_c))
             ws.forecast = fc
             at_threshold = (not ws.signal_lost) and (
                 ws.filter.ct >= ws.core_limit_c or (ws.psi is not None and ws.psi >= C.PSI_CRITICAL))
             extra = C.ALERT_OLDER_WORKER_EXTRA_MIN if ws.older else 0.0
             events = ws.alerts.step(AlertInputs(
-                ttc_min=fc.ttc_min, at_threshold=at_threshold,
+                ttc_min=fc.ttc_min, ttc_expected_min=fc.ttc_expected_min, at_threshold=at_threshold,
                 exposure_minutes=ws.exposure_continuous_min, signal_lost=ws.signal_lost,
                 extra_lead_min=extra))
             ws.reasons = explain(ReasonInputs(
@@ -305,10 +313,12 @@ class Gateway:
             "exposure_total_min": ws.exposure_total_min,
             "exposure_continuous_min": ws.exposure_continuous_min,
             "ttc_min": None if fc.ttc_min is None else round(fc.ttc_min, 1),
+            "ttc_expected_min": None if fc.ttc_expected_min is None else round(fc.ttc_expected_min, 1),
             "ttc_driver": fc.driver,
             "forecast_stale": fc.stale,
             "core_slope_c_per_h": None if fc.core_slope_c_per_h is None else round(fc.core_slope_c_per_h, 2),
             "forecast_line": [(round(k, 1), round(v, 3)) for k, v in fc.core_line],
+            "risk_line": [(round(k, 1), round(v, 3)) for k, v in fc.risk_line],
             "reasons": ws.reasons,
             "point": h,
         }

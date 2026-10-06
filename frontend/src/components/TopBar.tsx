@@ -27,6 +27,9 @@ export function TopBar({ tick, state, connected }: { tick?: Tick; state: RunStat
               shade estimate
             </span>
           )}
+          {site?.wbgt_method === 'liljegren_held_solar' && (
+            <span className="badge warn" title="Solar sensor offline: using its last good reading">solar held</span>
+          )}
         </div>
         <div className="big">
           {fmt(site?.wbgt_c, 1, '°C')}
@@ -55,7 +58,7 @@ export function TopBar({ tick, state, connected }: { tick?: Tick; state: RunStat
       <div className="gateway">
         <span className={`dot ${connected ? 'ok' : 'bad'}`} />
         {connected ? 'Gateway live' : 'Reconnecting…'}
-        <div className="sub">runs offline on site</div>
+        <div className="sub">runs offline · forecaster {state?.forecaster ?? '…'}</div>
       </div>
     </header>
   )

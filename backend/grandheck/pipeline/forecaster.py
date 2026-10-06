@@ -29,6 +29,8 @@ class Forecast:
     psi_slope_per_h: float | None
     stale: bool                     # not enough real data to forecast
     core_line: list[tuple[float, float]] = field(default_factory=list)  # (minutes ahead, core C)
+    risk_line: list[tuple[float, float]] = field(default_factory=list)  # v2: forecast + z x error
+    ttc_expected_min: float | None = None   # crossing of the central forecast (v1: same as ttc_min)
 
 
 def _slope_per_min(t: np.ndarray, y: np.ndarray) -> float:
@@ -75,15 +77,22 @@ def forecast(times_min: list[float], core_c: list[float | None], psi: list[float
     # Projected core line for the chart: out to the crossing (plus a little), max 60 min.
     reach = min(60.0, (ttc_core + 10.0) if ttc_core is not None else 60.0)
     line = [(float(k), float(c[-1] + core_slope * k)) for k in range(0, int(reach) + 1, 5)]
-    return Forecast(ttc, driver, core_slope * 60.0, psi_slope * 60.0, stale=False, core_line=line)
+    return Forecast(ttc, driver, core_slope * 60.0, psi_slope * 60.0, stale=False, core_line=line,
+                    ttc_expected_min=ttc)
 
 
 def combine_with_model(v1: Forecast, path: list[tuple[int, float]], core_limit_c: float,
-                       ttc_core_model: float | None) -> Forecast:
+                       ttc_core_model: float | None,
+                       risk: list[tuple[int, float]] | None = None,
+                       ttc_core_expected: float | None = None) -> Forecast:
     """
     v2: the model's predicted core path replaces straight-line extrapolation for
     the core-temperature crossing within its 60-min reach. Beyond that reach we
     keep v1's longer-range estimate; the PSI crossing still comes from v1.
+
+    ttc_core_model is the crossing of the RISK edge (forecast + z x error): it
+    drives Advisory/Warning. ttc_core_expected is the crossing of the central
+    forecast: Critical ("it is happening now") is reserved for that.
     """
     if v1.stale:
         return v1
@@ -95,7 +104,11 @@ def combine_with_model(v1: Forecast, path: list[tuple[int, float]], core_limit_c
     candidates = [(v, n) for v, n in ((ttc_core, "core"), (ttc_psi, "psi")) if v is not None]
     ttc, driver = min(candidates) if candidates else (None, None)
     line = [(float(h), float(v)) for h, v in path]
-    return Forecast(ttc, driver, v1.core_slope_c_per_h, v1.psi_slope_per_h, stale=False, core_line=line)
+    risk_line = [(float(h), float(v)) for h, v in (risk or [])]
+    expected = [v for v in (ttc_core_expected, ttc_psi) if v is not None]
+    return Forecast(ttc, driver, v1.core_slope_c_per_h, v1.psi_slope_per_h, stale=False,
+                    core_line=line, risk_line=risk_line,
+                    ttc_expected_min=min(expected) if expected else None)
 
 
 @dataclass

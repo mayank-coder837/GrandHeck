@@ -79,6 +79,7 @@ class DemoRunner:
             "speeds": SPEEDS,
             "paused": self.paused,
             "finished": self.sim.finished,
+            "forecaster": self.gateway.forecaster_version,
             "profiles": [p.model_dump() | {"age_band": p.age_band} for p in self.sim.profiles],
             "site": {"id": C.SITE_ID, "name": C.SITE_NAME, "lat": C.SITE_LAT_DEG, "lon": C.SITE_LON_DEG,
                      "utc_offset_h": C.SITE_UTC_OFFSET_H},

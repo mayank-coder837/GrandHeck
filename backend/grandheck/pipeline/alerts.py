@@ -24,7 +24,8 @@ LEVELS = ["NONE", "ADVISORY", "WARNING", "CRITICAL"]
 
 @dataclass
 class AlertInputs:
-    ttc_min: float | None
+    ttc_min: float | None           # earliest likely crossing (v2: risk edge) -> Advisory/Warning
+    ttc_expected_min: float | None  # crossing of the central forecast -> Critical
     at_threshold: bool              # core estimate or PSI already at/over the danger line
     exposure_minutes: int           # continuous minutes above own WBGT limit since last rest
     signal_lost: bool
@@ -41,7 +42,8 @@ class AlertEvent:
 def raw_level(x: AlertInputs) -> int:
     """The tier the current numbers point to, before any hysteresis."""
     lead = x.extra_lead_min
-    if x.at_threshold or (x.ttc_min is not None and x.ttc_min <= C.ALERT_TTC_CRITICAL_MIN + lead):
+    if x.at_threshold or (x.ttc_expected_min is not None
+                          and x.ttc_expected_min <= C.ALERT_TTC_CRITICAL_MIN + lead):
         return 3
     if x.ttc_min is not None and x.ttc_min <= C.ALERT_TTC_WARNING_MIN + lead:
         return 2
@@ -71,9 +73,10 @@ class AlertStateMachine:
     def _clear_for_step_down(self, x: AlertInputs) -> bool:
         if x.at_threshold:
             return False
-        if x.ttc_min is None:
+        ttc = x.ttc_expected_min if self.level == 3 else x.ttc_min
+        if ttc is None:
             return True
-        return x.ttc_min > _tier_limit(self.level, x.extra_lead_min) + C.ALERT_DEESCALATE_MARGIN_MIN
+        return ttc > _tier_limit(self.level, x.extra_lead_min) + C.ALERT_DEESCALATE_MARGIN_MIN
 
     def step(self, x: AlertInputs) -> list[AlertEvent]:
         events: list[AlertEvent] = []

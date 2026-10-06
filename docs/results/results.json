@@ -10,12 +10,12 @@
       "label": "GrandHeck v2 (Warning or higher)",
       "detected": 392,
       "detection_rate": 0.8082474226804124,
-      "median_lead_min": 39.0,
-      "mean_lead_min": 37.16326530612245,
+      "median_lead_min": 39.5,
+      "mean_lead_min": 37.22959183673469,
       "missed": 93,
-      "false_alarms": 720,
-      "false_alarms_per_100_worker_shifts": 45.0,
-      "precision": 0.3803786574870912,
+      "false_alarms": 665,
+      "false_alarms_per_100_worker_shifts": 41.5625,
+      "precision": 0.3738229755178908,
       "quiet_workers_alarmed_pct": 12.73542600896861
     },
     "ours_advisory": {
@@ -23,11 +23,11 @@
       "detected": 468,
       "detection_rate": 0.9649484536082474,
       "median_lead_min": 55.0,
-      "mean_lead_min": 45.06410256410256,
+      "mean_lead_min": 45.05555555555556,
       "missed": 17,
-      "false_alarms": 2552,
-      "false_alarms_per_100_worker_shifts": 159.5,
-      "precision": 0.14333669016448472,
+      "false_alarms": 2549,
+      "false_alarms_per_100_worker_shifts": 159.3125,
+      "precision": 0.14434373950990265,
       "quiet_workers_alarmed_pct": 40.35874439461883
     },
     "ours_v1": {
@@ -49,9 +49,9 @@
       "median_lead_min": 60.0,
       "mean_lead_min": 53.223880597014926,
       "missed": 83,
-      "false_alarms": 4513,
-      "false_alarms_per_100_worker_shifts": 282.0625,
-      "precision": 0.056252613969050604,
+      "false_alarms": 4497,
+      "false_alarms_per_100_worker_shifts": 281.0625,
+      "precision": 0.05644146034410407,
       "quiet_workers_alarmed_pct": 100.0
     },
     "hr": {
