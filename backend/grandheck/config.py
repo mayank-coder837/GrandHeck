@@ -151,6 +151,8 @@ HR_SUSTAINED_MINUTES = 5            # TODO(verify): ACGIH says "several minutes"
 # Exposure tracking
 # ---------------------------------------------------------------------------
 ACTIVITY_REST_THRESHOLD = 0.15      # DESIGN: activity index (0-1) below this = resting
+ACTIVITY_SMOOTHING_MIN = 3          # DESIGN: median of the last N readings, so one jolt
+                                    # does not cancel a rest bout
 REST_MIN_DURATION_MIN = 10          # DESIGN: a rest bout must last this long to reset
                                     # "time since rest". NIOSH work/rest regimens use
                                     # >=15 min breaks per hour (see [NIOSH] Ch. 8).
@@ -160,9 +162,25 @@ HISTORY_MINUTES = 240               # DESIGN: per-worker history kept for charts
 # ---------------------------------------------------------------------------
 # Forecaster
 # ---------------------------------------------------------------------------
-FORECAST_WINDOW_MIN = 15            # DESIGN: rolling regression window
-FORECAST_MIN_POINTS = 8             # DESIGN: need this many points before forecasting
+FORECAST_WINDOW_MIN = 20            # DESIGN: rolling regression window
+FORECAST_MIN_POINTS = 12            # DESIGN: need this many points before forecasting
 FORECAST_HORIZON_MIN = 120          # DESIGN: beyond this we report "> 120 min"
+FORECAST_MIN_CORE_SLOPE_C_PER_H = 0.1   # DESIGN: flatter than this = "not rising"
+FORECAST_MIN_PSI_SLOPE_PER_H = 0.5      # DESIGN: same, for PSI
+
+# Alert explanations. DESIGN: these only rank and phrase the "why" factors
+# shown with an alert; they never decide whether an alert fires.
+REASON_SCALES = {
+    "core_trend_c_per_h": 1.0,      # a +1 C/h core trend scores 1.0
+    "hr_rise_bpm_15min": 15.0,
+    "wbgt_excess_c": 3.0,
+    "wbgt_trend_c_per_h": 1.5,
+    "minutes_since_rest": 60.0,
+    "psi": 7.0,
+}
+REASON_FIXED_SCORES = {"unacclimatized": 0.5, "older_worker": 0.4}
+REASON_MIN_SCORE = 0.35
+REASON_MAX = 3
 
 # ---------------------------------------------------------------------------
 # Alert state machine  (all DESIGN choices, not health thresholds)
@@ -171,15 +189,17 @@ FORECAST_HORIZON_MIN = 120          # DESIGN: beyond this we report "> 120 min"
 ALERT_TTC_ADVISORY_MIN = 45
 ALERT_TTC_WARNING_MIN = 20
 ALERT_TTC_CRITICAL_MIN = 5
-ALERT_ESCALATE_TICKS = 2            # consecutive minutes a higher tier must hold
+ALERT_ESCALATE_TICKS = 3            # consecutive minutes a higher tier must hold
 ALERT_DEESCALATE_TICKS = 5          # consecutive minutes a lower tier must hold
 ALERT_DEESCALATE_MARGIN_MIN = 10    # TTC must exceed tier limit by this to step down
-ALERT_RENOTIFY_MIN = 10             # re-send an unchanged Warning/Critical this often
+ALERT_RENOTIFY_MIN = 15             # re-send an unchanged Warning/Critical this often
 ALERT_OLDER_WORKER_EXTRA_MIN = 10   # DESIGN: older workers (age band 45+) are warned
                                     # this much earlier; age is a heat-illness risk
                                     # factor in [NIOSH] Ch. 4, the margin itself is ours.
-ALERT_EXPOSURE_ADVISORY_MIN = 30    # DESIGN: >= this many minutes above own WBGT limit
-                                    # without rest raises an Advisory on its own.
+ALERT_EXPOSURE_ADVISORY_MIN = 60    # DESIGN: >= this many minutes above own WBGT limit
+                                    # without a rest raises an Advisory on its own.
+                                    # Longer than the standard 45-min work block, so it
+                                    # only fires when a break has been skipped.
 
 # Actions per tier. Hydration guidance: about 1 cup (8 oz, ~240 ml) every
 # 15-20 minutes during work in heat [NIOSH] [OSHA].
