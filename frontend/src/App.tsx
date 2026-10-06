@@ -75,6 +75,14 @@ export default function App() {
   live.current = { state, selected, order, byId }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // "?" first, before the modifier check: some keyboard layouts type it with AltGr
+      // (reported as Ctrl+Alt), and Firefox grabs "/" for quick-find unless we claim it.
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement
+      if (!typing && !e.metaKey && (e.key === '?' || e.key === '/' || (e.code === 'Slash' && e.shiftKey))) {
+        e.preventDefault()
+        setCheatSheet((v) => !v)
+        return
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return
       const { state: st, selected: sel, order: ord, byId: ids } = live.current
@@ -100,7 +108,6 @@ export default function App() {
       }
       else if (k === 'p') toggleRef.current()
       else if (k === 't') switchThemeRef.current()
-      else if (k === '?') setCheatSheet((v) => !v)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -143,6 +150,7 @@ export default function App() {
       )}
 
       {state && <DemoControls state={state} targetId={selected} workerName={name} onToast={toast}
+        onShowShortcuts={() => setCheatSheet(true)}
         presentation={presentation} onTogglePresentation={togglePresentation} />}
       {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
       <Toasts toasts={toasts} />
