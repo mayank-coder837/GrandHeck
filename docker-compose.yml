@@ -1,0 +1,9 @@
+# Optional: `docker compose up`, then open http://localhost:8000
+services:
+  gateway:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data        # SQLite alert/reading log survives restarts
+    restart: unless-stopped

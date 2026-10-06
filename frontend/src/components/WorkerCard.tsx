@@ -44,7 +44,7 @@ export function WorkerCard({ w, horizon, selected, onSelect }: {
         {w.resting && !w.signal_lost && <span className="tag tag-rest">resting</span>}
       </div>
 
-      <div className="ttc-label">Time to critical</div>
+      <div className="ttc-label">Time to critical · if unchanged</div>
       <Countdown w={w} horizon={horizon} />
 
       <div className="metrics">
