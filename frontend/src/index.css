@@ -162,3 +162,17 @@ small { font-size: 0.6em; color: var(--muted); margin-left: 2px; }
 .controls button.active { background: var(--accent); color: #031525; font-weight: 700; }
 .controls button.event { border-color: #7c2d12; }
 .controls button.calm { border-color: #155e75; }
+
+/* ---------- redline meter ---------- */
+.meter { position: relative; height: 8px; border-radius: 4px; background: #1c2740; overflow: visible; margin-right: 3px; }
+.meter-fill { height: 100%; border-radius: 4px 0 0 4px; background: #64748b; transition: width 0.8s ease, background-color 0.4s; }
+.meter-limit { position: absolute; top: -4px; right: -3px; width: 3px; height: 16px; border-radius: 2px; background: var(--critical); }
+.meter.tone-ADVISORY .meter-fill { background: var(--advisory); }
+.meter.tone-WARNING .meter-fill { background: var(--warning); }
+.meter.tone-CRITICAL .meter-fill { background: var(--critical); }
+.meter.tone-recovering .meter-fill { background: #2dd4bf; }
+.meter.tone-lost .meter-fill { background: #475569; }
+.meter.over .meter-fill {
+  border-radius: 4px;
+  background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.28) 0 4px, transparent 4px 8px);
+}

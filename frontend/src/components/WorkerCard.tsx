@@ -1,4 +1,6 @@
+import { isRecovering } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
+import { RedlineMeter } from './RedlineMeter'
 import type { WorkerSnapshot } from '../types'
 
 function Countdown({ w, horizon }: { w: WorkerSnapshot; horizon: number }) {
@@ -46,6 +48,8 @@ export function WorkerCard({ w, horizon, selected, onSelect }: {
 
       <div className="ttc-label">Time to critical · if unchanged</div>
       <Countdown w={w} horizon={horizon} />
+
+      <RedlineMeter w={w} recovering={isRecovering(w)} />
 
       <div className="metrics">
         <div title={`Danger limit ${w.core_limit_c.toFixed(1)} °C`}><span className="k">Core</span><span className="v">{fmt(w.core_c, 1, '°C')}</span></div>
