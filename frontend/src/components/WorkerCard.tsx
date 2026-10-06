@@ -45,8 +45,9 @@ export function CountdownSlot({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }
     main = <>{Math.round(w.ttc_min)}<span className="unit">min</span></>
     sub = 'to critical'
   } else {
+    // Forecast is clear, but the alert tier is still stepping down (hysteresis).
     tone = 'muted'
-    main = 'Safe · 2h+'
+    main = w.level === 'NONE' ? 'Safe · 2h+' : 'Easing · 2h+'
   }
 
   return (
