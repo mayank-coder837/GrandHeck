@@ -261,6 +261,7 @@ Worker profiles (`WorkerProfile` in `schema.py`) hold: `worker_id`, `name`, `rol
 | **D** | Sensor dropout (same targeting) | **R** | Send selected worker to rest |
 | **Space** | Pause / resume | **1–5** | Speed 0.5× / 1× / 2× / 5× / 10× |
 | **G** | Compare with true core temp (detail view) | **← →** / **Esc** | Previous / next worker, close detail |
+| **P** | Presentation mode (≈20% larger text) | **T** | Switch dark / light theme |
 
 A new shift silently pre-simulates 15 minutes, so the dashboard opens with live countdowns instead of "calibrating".
 

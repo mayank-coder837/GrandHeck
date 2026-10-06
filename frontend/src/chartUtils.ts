@@ -1,23 +1,22 @@
 // Shared chart styling and time-axis helpers (detail view, shift overview).
 
+import type { Tokens } from './theme'
 import type { Tick } from './types'
 
-export const CHART = {
-  core: '#38bdf8',
-  truth: '#94a3b8',
-  forecast: '#fb923c',
-  band: '#fb923c',
-  limit: '#ef4444',
-  hr: '#f472b6',
-  psi: '#a78bfa',
-  wbgt: '#facc15',
-  grid: 'rgba(148,163,184,0.12)',
-  axis: '#8a9bb8',
-  warning: '#fb923c',
-  critical: '#ef4444',
+/** Axis tick style from the active theme tokens (charts can't read CSS variables). */
+export function axisTick(t: Tokens) {
+  return { fontSize: 12, fill: t.muted, fontFamily: "'IBM Plex Sans', Arial, sans-serif" }
 }
-export const TOOLTIP_STYLE = { background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#e5ecf6', fontSize: 12 }
-export const AXIS_TICK = { fontSize: 12, fill: CHART.axis }
+
+/** Where a path first crosses a horizontal limit (linear interpolation), if it does. */
+export function crossing(points: [number, number][], limit: number): [number, number] | null {
+  for (let i = 1; i < points.length; i++) {
+    const [x0, y0] = points[i - 1]
+    const [x1, y1] = points[i]
+    if (y0 < limit && y1 >= limit) return [x0 + ((limit - y0) / (y1 - y0)) * (x1 - x0), limit]
+  }
+  return null
+}
 
 /** Minute <-> site clock, anchored on the last tick's own HH:MM. */
 export function makeClock(last: Tick) {

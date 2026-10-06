@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Redline · Heat-strain early warning</title>
+    <script>
+      // Set the theme before anything renders, so there is no flash of the wrong one.
+      (function () {
+        var t = null
+        try { t = localStorage.getItem('redline.theme') } catch (e) {}
+        if (t !== 'dark' && t !== 'light') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+        }
+        document.documentElement.setAttribute('data-theme', t)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

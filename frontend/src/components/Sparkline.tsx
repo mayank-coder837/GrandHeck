@@ -1,4 +1,5 @@
-import { isRecovering } from '../derive'
+import { crossing } from '../chartUtils'
+import { useTheme } from '../theme'
 import type { Tick, WorkerSnapshot } from '../types'
 
 const PAST_MIN = 60
@@ -7,20 +8,13 @@ const MIN_SPAN_C = 0.6        // keep flat lines from looking jumpy
 const W = 240
 const H = 36
 
-const TONE: Record<string, string> = {
-  NONE: '#94a3b8',
-  ADVISORY: '#facc15',
-  WARNING: '#fb923c',
-  CRITICAL: '#f87171',
-  recovering: '#2dd4bf',
-  lost: '#64748b',
-}
-
 /**
- * The card's signature visual: last hour of estimated core temperature, the
- * forecast as a dashed segment, and this worker's danger limit as a red line.
+ * The card's signature visual, the deck cover's mark made live: the last hour of
+ * estimated core temperature, the forecast dashed, this worker's danger limit as
+ * a red line, and a red dot where the forecast reaches it.
  */
 export function Sparkline({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }) {
+  const { t } = useTheme()
   const last = ticks[ticks.length - 1]
   if (!last) return <div className="spark" />
   const now = last.minute
@@ -28,8 +22,8 @@ export function Sparkline({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }) {
   const to = now + AHEAD_MIN
 
   const past: [number, number | null][] = ticks
-    .filter((t) => t.minute >= from)
-    .map((t) => [t.minute, t.workers.find((x) => x.worker_id === w.worker_id)?.point.core_c ?? null])
+    .filter((tk) => tk.minute >= from)
+    .map((tk) => [tk.minute, tk.workers.find((x) => x.worker_id === w.worker_id)?.point.core_c ?? null])
   const showForecast = !w.forecast_stale && !w.signal_lost && w.forecast_line.length > 0
   const future: [number, number][] = showForecast
     ? [[now, w.core_c], ...w.forecast_line.filter(([k]) => k > 0 && k <= AHEAD_MIN).map(([k, v]) => [now + k, v] as [number, number])]
@@ -55,24 +49,27 @@ export function Sparkline({ w, ticks }: { w: WorkerSnapshot; ticks: Tick[] }) {
   }
   if (cur.length) segments.push(cur.join(' '))
 
-  const tone = w.signal_lost ? 'lost' : isRecovering(w) ? 'recovering' : w.level
-  const color = TONE[tone]
   const limitY = y(w.core_limit_c)
+  const cross = future.length > 1 && w.core_c < w.core_limit_c ? crossing(future, w.core_limit_c) : null
 
   return (
     <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
       aria-label={`Core temperature ${w.core_c.toFixed(1)} °C, limit ${w.core_limit_c.toFixed(1)} °C`}>
       <title>{`Core ${w.core_c.toFixed(1)} °C · limit ${w.core_limit_c.toFixed(1)} °C · last hour and forecast`}</title>
-      <rect x={0} y={0} width={W} height={Math.max(0, limitY)} fill="#ef4444" opacity={0.08} />
-      <line x1={0} x2={W} y1={limitY} y2={limitY} stroke="#ef4444" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
-      <line x1={x(now)} x2={x(now)} y1={0} y2={H} stroke="#334155" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <line x1={x(now)} x2={x(now)} y1={0} y2={H} stroke={t.border} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <line x1={1} x2={W - 1} y1={limitY} y2={limitY} stroke={t.red} strokeWidth={1.5} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       {segments.map((pts, i) => (
-        <polyline key={i} points={pts} fill="none" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke"
+        <polyline key={i} points={pts} fill="none" stroke={t['text-2']} strokeWidth={1.5} vectorEffect="non-scaling-stroke"
           strokeLinejoin="round" strokeLinecap="round" />
       ))}
       {future.length > 1 && (
         <polyline points={future.map(([m, v]) => `${x(m).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} fill="none"
-          stroke={color} strokeWidth={2} strokeDasharray="4 3" opacity={0.8} vectorEffect="non-scaling-stroke" />
+          stroke={t.muted} strokeWidth={1.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+      )}
+      {cross && (
+        // A circle would stretch with preserveAspectRatio="none"; a zero-length round-capped line stays round.
+        <line x1={x(cross[0])} x2={x(cross[0])} y1={limitY} y2={limitY} stroke={t.red} strokeWidth={6} strokeLinecap="round"
+          vectorEffect="non-scaling-stroke" />
       )}
     </svg>
   )

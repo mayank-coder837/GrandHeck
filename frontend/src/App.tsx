@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertFeed, type AckMap } from './components/AlertFeed'
-import { CrewBanner } from './components/CrewBanner'
 import { CrewGrid, useStableRiskOrder } from './components/CrewGrid'
 import { CheatSheet, DemoControls, Toasts, useToasts } from './components/DemoControls'
 import { ShiftOverview } from './components/ShiftOverview'
+import { StatStrip } from './components/StatStrip'
+import { toggleTheme, useTheme } from './theme'
 import { TopBar } from './components/TopBar'
 import { WorkerCard } from './components/WorkerCard'
 import { WorkerDetail } from './components/WorkerDetail'
@@ -22,6 +23,10 @@ export default function App() {
     try { return localStorage.getItem('redline.presentation') === '1' } catch { return false }
   })
   const { toasts, push: toast } = useToasts()
+  const { theme } = useTheme()
+  const switchTheme = () => toast(toggleTheme() === 'dark' ? 'Dark theme' : 'Light theme')
+  const switchThemeRef = useRef(switchTheme)
+  switchThemeRef.current = switchTheme
 
   // Presentation mode scales the whole UI (~20%) by changing the root font size.
   useEffect(() => {
@@ -80,6 +85,7 @@ export default function App() {
         if (speed !== undefined) { control({ action: 'speed', speed }); toast(`Speed ${speed}×`) }
       }
       else if (k === 'p') toggleRef.current()
+      else if (k === 't') switchThemeRef.current()
       else if (k === '?') setCheatSheet((v) => !v)
     }
     window.addEventListener('keydown', onKey)
@@ -91,11 +97,15 @@ export default function App() {
   return (
     <div className="app">
       <TopBar tick={last} state={state} connected={connected}
-        historyMinutes={ticks.length ? last.minute - ticks[0].minute : 0} />
+        historyMinutes={ticks.length ? last.minute - ticks[0].minute : 0} theme={theme} onToggleTheme={switchTheme} />
 
       <main className="main">
         <section className="crew">
-          <CrewBanner workers={workers} site={last?.site} />
+          <StatStrip workers={workers} site={last?.site} />
+          <div className="section-head">
+            <span className="eyebrow">Crew</span>
+            <h2>{workers.length} on shift</h2>
+          </div>
           <CrewGrid order={order}>
             {(id) => byId[id] && (
               <WorkerCard w={byId[id]} ticks={ticks} selected={id === selected} onSelect={() => setSelected(id)} />

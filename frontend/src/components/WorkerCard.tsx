@@ -98,7 +98,7 @@ export function WorkerCard({ w, ticks, selected, onSelect }: {
         Core <b>{fmt(w.core_c, 1)}</b> °C · HR <b>{fmt(w.hr, 0)}</b>
       </div>
       {tags.length > 0 && (
-        <div className="card-tags">{tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+        <div className="card-tags">{tags.map((t) => <span key={t} className="tag risk">{t}</span>)}</div>
       )}
       {reason && <div className="card-reason">{reason}</div>}
     </button>

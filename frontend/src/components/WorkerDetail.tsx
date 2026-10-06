@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer,
+  Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { actionHeadline, isRecovering, orderedReasons, riskTags } from '../derive'
 import { LEVEL_LABEL, fmt } from '../format'
 import type { Alert, Tick, WorkerSnapshot } from '../types'
-import { AXIS_TICK, CHART, TOOLTIP_STYLE, domainWithPadding, makeClock, rollingMean } from '../chartUtils'
+import { axisTick, crossing, domainWithPadding, makeClock, rollingMean } from '../chartUtils'
+import { tooltipStyle, useTheme } from '../theme'
 import { CountdownSlot } from './WorkerCard'
 
 const HISTORY_WINDOW_MIN = 120
 const WBGT_SMOOTH_MIN = 5
 const NOWCAST_NOTE_THRESHOLD_C = 0.1
-const C = CHART
 
 export function WorkerDetail({
   worker, ticks, alerts, acked, showTruth, onToggleTruth, onAck, onRest, onClose, onPrev, onNext,
@@ -30,6 +30,12 @@ export function WorkerDetail({
   onNext: () => void
 }) {
   const [protocol, setProtocol] = useState(false)
+  const { t } = useTheme()
+  const C = {
+    core: t.text, truth: t.recovering, forecast: t.muted, band: t.muted, limit: t.red, limitText: t['red-text'],
+    hr: t['text-2'], psi: t['text-2'], psiLine: t.muted, wbgt: t.advisory, grid: t.grid, tint: t['critical-tint'], now: t.border,
+  }
+  const tip = { contentStyle: tooltipStyle(t), labelStyle: { color: t.muted }, itemStyle: { color: t.text }, cursor: { stroke: t.border } }
   const [details, setDetails] = useState(false)
   const id = worker.worker_id
   const last = ticks[ticks.length - 1]
@@ -88,6 +94,8 @@ export function WorkerDetail({
   }, [history, showForecast, worker, now])
 
   const end = coreRows[coreRows.length - 1]?.minute ?? now
+  const forecastPts = coreRows.filter((r) => r.forecast != null).map((r) => [r.minute, r.forecast!] as [number, number])
+  const crossAt = showForecast && worker.core_c < limit ? crossing(forecastPts, limit) : null
   const coreValues = [limit, ...coreRows.flatMap((r) => [
     r.core, showTruth ? r.truth : null, r.forecast, ...(r.band ?? []),
   ]).filter((v): v is number => v != null)]
@@ -114,7 +122,7 @@ export function WorkerDetail({
   const smallXTicks = clock.halfHours(start, now)
   const axisX = (domainEnd: number, xticks: number[]) => (
     <XAxis dataKey="minute" type="number" domain={[start, domainEnd]} ticks={xticks}
-      tickFormatter={clock.label} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+      tickFormatter={clock.label} tick={axisTick(t)} axisLine={false} tickLine={false} />
   )
   const tooltipLabel = (m: unknown) => clock.label(Number(m))
 
@@ -125,12 +133,13 @@ export function WorkerDetail({
         {/* ---------- header ---------- */}
         <div className="focus-head">
           <div className="focus-id">
+            <span className="eyebrow">Worker</span>
             <div className="focus-title">
               <h2>{p.name}</h2>
               <span className="muted">{p.role}</span>
               {(needsAction || recovering) && <span className={`level-chip level-${chip[0]}`}>{chip[1]}</span>}
             </div>
-            <div className="card-tags">{tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+            <div className="card-tags">{tags.map((tag) => <span key={tag} className="tag risk">{tag}</span>)}</div>
           </div>
           <div className="focus-nav">
             <button className="btn icon" onClick={onPrev} aria-label="Previous worker" title="Previous (←)">‹</button>
@@ -194,6 +203,7 @@ export function WorkerDetail({
               {showForecast && <span><i className="sw dash" style={{ borderColor: C.forecast }} />Forecast</span>}
               {showForecast && worker.risk_line.length > 0 && <span><i className="sw band" style={{ background: C.band }} />Likely range</span>}
               <span><i className="sw line" style={{ background: C.limit }} />Danger limit</span>
+              {crossAt && <span><i className="dot" style={{ background: C.limit }} />Predicted crossing</span>}
               {showTruth && <span><i className="sw line" style={{ background: C.truth }} />True core temp (sim)</span>}
             </div>
             <label className="toggle small" title="Shortcut: G">
@@ -201,29 +211,32 @@ export function WorkerDetail({
               Compare with true core temp (simulation only)
             </label>
           </div>
+          <div className="chart-area">
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={coreRows} margin={{ top: 16, right: 112, bottom: 0, left: 0 }}>
               <CartesianGrid stroke={C.grid} vertical={false} />
               {axisX(end, coreXTicks)}
-              <YAxis domain={coreDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={48}
+              <YAxis domain={coreDomain} tick={axisTick(t)} axisLine={false} tickLine={false} width={48}
                 tickFormatter={(v) => `${Number(v).toFixed(1)}°`} allowDataOverflow={false} />
-              <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE}
+              <Tooltip labelFormatter={tooltipLabel} {...tip}
                 formatter={(v, name) => Array.isArray(v) ? [`${Number(v[0]).toFixed(2)}–${Number(v[1]).toFixed(2)} °C`, name] : [`${Number(v).toFixed(2)} °C`, name]} />
-              <ReferenceArea y1={limit} y2={coreDomain[1]} fill={C.limit} fillOpacity={0.07} ifOverflow="hidden" />
+              <ReferenceArea y1={limit} y2={coreDomain[1]} fill={C.tint} fillOpacity={1} ifOverflow="hidden" />
               <ReferenceLine y={limit} stroke={C.limit} strokeWidth={2}
-                label={{ value: `Danger ${limit.toFixed(1)} °C`, position: 'right', fill: C.limit, fontSize: 13, fontWeight: 700 }} />
-              <ReferenceLine x={now} stroke="#64748b" strokeDasharray="3 3"
-                label={{ value: 'now', position: 'top', fill: C.axis, fontSize: 12 }} />
+                label={{ value: `Danger ${limit.toFixed(1)} °C`, position: 'right', fill: C.limitText, fontSize: 13, fontWeight: 600 }} />
+              <ReferenceLine x={now} stroke={C.now} strokeDasharray="3 3"
+                label={{ value: 'now', position: 'top', fill: t.muted, fontSize: 12 }} />
               {showForecast && (
-                <Area dataKey="band" name="Likely range" stroke="none" fill={C.band} fillOpacity={0.18} isAnimationActive={false} connectNulls />
+                <Area dataKey="band" name="Likely range" stroke="none" fill={C.band} fillOpacity={0.15} isAnimationActive={false} connectNulls />
               )}
-              <Line dataKey="core" name="Estimated core temp" stroke={C.core} strokeWidth={3} dot={false} isAnimationActive={false} connectNulls={false} />
+              <Line dataKey="core" name="Estimated core temp" stroke={C.core} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls={false} />
               {showForecast && (
-                <Line dataKey="forecast" name="Forecast" stroke={C.forecast} strokeWidth={3} strokeDasharray="8 5" dot={false} isAnimationActive={false} connectNulls />
+                <Line dataKey="forecast" name="Forecast" stroke={C.forecast} strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} connectNulls />
               )}
               {showTruth && <Line dataKey="truth" name="True core temp (sim)" stroke={C.truth} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
+              {crossAt && <ReferenceDot x={crossAt[0]} y={crossAt[1]} r={4.5} fill={C.limit} stroke={t['surface-sunk']} strokeWidth={1.5} ifOverflow="visible" />}
             </ComposedChart>
           </ResponsiveContainer>
+          </div>
           {showForecast && nowcast != null && Math.abs(nowcast - worker.core_c) > NOWCAST_NOTE_THRESHOLD_C && (
             <div className="chart-note">
               Model-corrected current core temp: {nowcast.toFixed(1)} °C. The heart-rate estimate lags when core temperature
@@ -236,55 +249,61 @@ export function WorkerDetail({
         <div className="small-charts">
           <div className="chart-block">
             <h3>Heart rate (bpm)</h3>
+            <div className="chart-area">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={smallRows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={C.grid} vertical={false} />
                 {axisX(now, smallXTicks)}
-                <YAxis domain={hrDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={40} />
-                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${Number(v).toFixed(0)} bpm`, 'Heart rate']} />
+                <YAxis domain={hrDomain} tick={axisTick(t)} axisLine={false} tickLine={false} width={40} />
+                <Tooltip labelFormatter={tooltipLabel} {...tip} formatter={(v) => [`${Number(v).toFixed(0)} bpm`, 'Heart rate']} />
                 <Line dataKey="hr" stroke={C.hr} strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
+          </div>
           <div className="chart-block">
             <h3>Strain index (PSI 0–10)</h3>
+            <div className="chart-area">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={smallRows} margin={{ top: 8, right: 84, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={C.grid} vertical={false} />
                 {axisX(now, smallXTicks)}
-                <YAxis domain={[0, 10]} ticks={[0, 3, 5, 7, 10]} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE} formatter={(v) => [Number(v).toFixed(1), 'PSI']} />
-                <ReferenceLine y={7} stroke={C.psi} strokeDasharray="4 4"
-                  label={{ value: 'High strain 7', position: 'right', fill: C.psi, fontSize: 12 }} />
+                <YAxis domain={[0, 10]} ticks={[0, 3, 5, 7, 10]} tick={axisTick(t)} axisLine={false} tickLine={false} width={28} />
+                <Tooltip labelFormatter={tooltipLabel} {...tip} formatter={(v) => [Number(v).toFixed(1), 'PSI']} />
+                <ReferenceLine y={7} stroke={C.psiLine} strokeDasharray="4 4"
+                  label={{ value: 'High strain 7', position: 'right', fill: t.muted, fontSize: 12 }} />
                 <Line dataKey="psi" stroke={C.psi} strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
+          </div>
           <div className="chart-block">
             <h3>Heat stress (WBGT) vs this worker's limit</h3>
+            <div className="chart-area">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={smallRows} margin={{ top: 8, right: 84, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={C.grid} vertical={false} />
                 {axisX(now, smallXTicks)}
-                <YAxis domain={wbgtDomain} stroke={C.axis} tick={AXIS_TICK} axisLine={false} tickLine={false} width={36}
+                <YAxis domain={wbgtDomain} tick={axisTick(t)} axisLine={false} tickLine={false} width={36}
                   tickFormatter={(v) => `${Number(v).toFixed(0)}°`} />
-                <Tooltip labelFormatter={tooltipLabel} contentStyle={TOOLTIP_STYLE}
+                <Tooltip labelFormatter={tooltipLabel} {...tip}
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
                     const r = payload[0].payload as { wbgt: number | null; wbgtRaw: number | null }
                     return (
-                      <div style={{ ...TOOLTIP_STYLE, padding: '6px 10px' }}>
+                      <div style={{ ...tooltipStyle(t), padding: '6px 10px' }}>
                         <div>{tooltipLabel(label)}</div>
-                        <div>WBGT {fmt(r.wbgtRaw, 1, ' °C')} <span style={{ color: C.axis }}>(5-min mean {fmt(r.wbgt, 1)})</span></div>
+                        <div>WBGT {fmt(r.wbgtRaw, 1, ' °C')} <span style={{ color: t.muted }}>(5-min mean {fmt(r.wbgt, 1)})</span></div>
                       </div>
                     )
                   }} />
-                <ReferenceArea y1={worker.wbgt_limit_c} y2={wbgtDomain[1]} fill={C.limit} fillOpacity={0.07} ifOverflow="hidden" />
+                <ReferenceArea y1={worker.wbgt_limit_c} y2={wbgtDomain[1]} fill={C.tint} fillOpacity={1} ifOverflow="hidden" />
                 <ReferenceLine y={worker.wbgt_limit_c} stroke={C.limit} strokeWidth={1.5}
-                  label={{ value: `Limit ${worker.wbgt_limit_c.toFixed(1)} °C`, position: 'right', fill: C.limit, fontSize: 12 }} />
+                  label={{ value: `Limit ${worker.wbgt_limit_c.toFixed(1)} °C`, position: 'right', fill: C.limitText, fontSize: 12 }} />
                 <Line dataKey="wbgt" stroke={C.wbgt} strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
+          </div>
           </div>
         </div>
 

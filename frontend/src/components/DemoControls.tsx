@@ -31,6 +31,7 @@ export const SHORTCUTS: [string, string][] = [
   ['B', 'New shift: heat building'],
   ['G', 'Compare with true core temp (in the detail view)'],
   ['P', 'Presentation mode (larger text for a projector)'],
+  ['T', 'Switch dark / light theme'],
   ['Space', 'Pause / resume'],
   ['1–5', 'Speed'],
   ['← →', 'Previous / next worker (detail view)'],

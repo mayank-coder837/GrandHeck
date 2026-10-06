@@ -1,15 +1,19 @@
 import { clockFromIso, fmt } from '../format'
+import type { ThemeName } from '../theme'
 import type { RunState, Tick } from '../types'
+import { RedlineMark } from './RedlineMark'
 
 const CATEGORY_TEXT = { low: 'Low', elevated: 'Elevated', high: 'High' } as const
 const TREND_MIN_HISTORY_MIN = 15
 const TREND_MIN_ABS_C_PER_H = 0.3
 
-export function TopBar({ tick, state, connected, historyMinutes }: {
+export function TopBar({ tick, state, connected, historyMinutes, theme, onToggleTheme }: {
   tick?: Tick
   state: RunState | null
   connected: boolean
   historyMinutes: number
+  theme: ThemeName
+  onToggleTheme: () => void
 }) {
   const site = tick?.site
   const category = site?.categories?.moderate
@@ -38,8 +42,11 @@ export function TopBar({ tick, state, connected, historyMinutes }: {
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="wordmark"><span className="wordmark-line" aria-hidden />Redline</div>
-        <div className="muted">Heat-strain early warning · {state?.site.name ?? '…'}</div>
+        <RedlineMark />
+        <div style={{ minWidth: 0 }}>
+          <div className="wordmark">Redline</div>
+          <div className="tagline">Heat-strain early warning · {state?.site.name ?? '…'}</div>
+        </div>
       </div>
 
       <div className="top-right">
@@ -57,13 +64,26 @@ export function TopBar({ tick, state, connected, historyMinutes }: {
             {category && <span className={`cat-label cat-${category}`}>{CATEGORY_TEXT[category]} for moderate work</span>}
             {quality && <span className="quality" title={quality} aria-label={quality}>⚠</span>}
           </div>
-          <div className="small muted">
+          <div className="small">
             Air {fmt(site?.air_temp_c, 1, ' °C')} · RH {fmt(site?.rh_pct, 0, '%')} · Wind {fmt(site?.wind_ms, 1, ' m/s')} ·
             Sun {site?.solar_wm2 == null ? 'no data' : `${site.solar_wm2.toFixed(0)} W/m²`}
           </div>
         </div>
 
         <span className={`live-dot ${connected ? 'ok' : 'bad'}`} title={statusTip} aria-label={statusTip} />
+        <button className="theme-toggle" onClick={onToggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme (T)`}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+          {theme === 'dark' ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </svg>
+          )}
+        </button>
       </div>
     </header>
   )

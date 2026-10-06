@@ -129,9 +129,12 @@ export function AlertFeed({ alerts, workers, acks, onAck, onRest, onSelect }: {
   )
 
   return (
-    <section className="feed" aria-label="Action needed">
+    <section className="feed panel" aria-label="Action needed">
       <div className="feed-head">
-        <h2>Action needed</h2>
+        <div className="section-head">
+          <span className="eyebrow">Action needed</span>
+          <h2>{active.length ? `${active.length} worker${active.length > 1 ? 's' : ''} to act on` : 'Nothing to act on'}</h2>
+        </div>
         <div className="menu-wrap">
           <button className="btn icon" onClick={() => setMenu(!menu)} aria-label="Feed options" aria-expanded={menu}>⋯</button>
           {menu && (
