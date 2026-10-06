@@ -4,13 +4,19 @@ Train forecaster v2 (pipeline/model.py) on simulated shifts.
     python -m eval.train_forecaster            (from backend/)
 
 Seeds: training 0-299, validation 300-399. Evaluation uses seeds >= 1000, which
-are never seen here. Features are exactly what the gateway computes live; the
-target is the hidden true core temperature h minutes later minus the current
-ECTemp estimate.
+are never seen here. Features are exactly what the gateway computes live.
+
+Target: the hidden true core temperature h minutes later, minus the current
+ECTemp estimate, IF THE WORKER KEEPS WORKING AS THEY ARE NOW. A warning should
+answer "what happens if nothing changes", not "what happens if they happen to
+take their usual break". So for a worker who is working at the sample time we
+copy their simulated body and run it forward with no breaks, under the same
+weather; for a resting worker the target is their actual future.
 """
 
 from __future__ import annotations
 
+import copy
 import sys
 from multiprocessing import Pool
 
@@ -28,36 +34,52 @@ VALID_SEEDS = range(300, 400)
 SAMPLE_EVERY_MIN = 3
 
 
-def collect(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Rows of (features, targets per horizon, current estimate, v1 straight-line path)."""
+def _run(seed: int, on_minute) -> None:
     sim, events, _ = make_shift(seed)
     gw = Gateway(sim.profiles, Bus(), forecaster="v1")
-    bus = gw.bus
-    truth = {w: [] for w in sim.workers}
-    rows = []
     while not sim.finished:
         if sim.minute in events:
             apply_event(sim, events[sim.minute])
         st = sim.step()
         for topic, msg in st.messages:
-            bus.publish(topic, msg)
+            gw.bus.publish(topic, msg)
         gw.tick(st.now)
-        for w, ws in gw.workers.items():
-            truth[w].append(st.truth[w]["tc_true"])
-            fc = ws.forecast
-            if st.minute % SAMPLE_EVERY_MIN or fc is None or fc.stale or ws.signal_lost:
-                continue
-            slope = (fc.core_slope_c_per_h or 0.0) / 60.0
-            rows.append((w, st.minute, ws.features.copy(), ws.filter.ct, slope))
+        on_minute(sim, gw, st)
+
+
+def collect(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Rows of (features, targets per horizon, current estimate, v1 straight-line path)."""
+    # Pass 1: record the weather the shift will have (it does not depend on the workers).
+    env: list[tuple[float, float]] = []
+    _run(seed, lambda sim, gw, st: env.append((st.env_truth["wbgt_sun"], st.env_truth["wbgt_shade"])))
+    horizon = HORIZONS_MIN[-1]
     X, Y, E, V1 = [], [], [], []
-    n = sim.shift_length_min
-    for w, minute, x, est, slope in rows:
-        if minute + HORIZONS_MIN[-1] >= n:
-            continue
-        X.append(x)
-        Y.append([truth[w][minute + h] - est for h in HORIZONS_MIN])
-        E.append(est)
-        V1.append([slope * h for h in HORIZONS_MIN])
+
+    # Pass 2: replay the identical shift; at sample minutes roll a copy of each worker forward.
+    def sample(sim, gw, st) -> None:
+        m = st.minute
+        if m % SAMPLE_EVERY_MIN or m + horizon >= len(env):
+            return
+        for w, ws in gw.workers.items():
+            fc = ws.forecast
+            if fc is None or fc.stale or ws.signal_lost:
+                continue
+            body = copy.deepcopy(sim.workers[w])
+            if st.truth[w]["working"]:
+                body.no_rest = True
+            future = {0: st.truth[w]["tc_true"]}
+            minute_of_day = st.now.hour * 60 + st.now.minute
+            for h in range(1, horizon + 1):
+                sun, shade = env[m + h]
+                future[h] = body.step(m + h, minute_of_day + h, sun, shade)["tc_true"]
+            est = ws.filter.ct
+            slope = (fc.core_slope_c_per_h or 0.0) / 60.0
+            X.append(ws.features.copy())
+            Y.append([future[h] - est for h in HORIZONS_MIN])
+            E.append(est)
+            V1.append([slope * h for h in HORIZONS_MIN])
+
+    _run(seed, sample)
     return np.array(X), np.array(Y), np.array(E), np.array(V1)
 
 
@@ -76,7 +98,7 @@ def main() -> None:
     Z = (Xv - model.mean) / model.scale
     pred = Z @ model.coef.T + model.intercept
     print(f"train rows {len(Xt)}, validation rows {len(Xv)}")
-    print("Validation RMSE of predicted true core temp (C), by horizon:")
+    print("Validation RMSE of predicted true core temp if work continues unchanged (C), by horizon:")
     print("  horizon   ECTemp only   v1 straight line   v2 model")
     metrics = {}
     for i, h in enumerate(HORIZONS_MIN):

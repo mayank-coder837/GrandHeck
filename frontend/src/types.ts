@@ -26,6 +26,7 @@ export interface WorkerSnapshot {
   profile: Profile
   core_limit_c: number
   wbgt_limit_c: number
+  workload_observed: 'light' | 'moderate' | 'heavy'
   level: Level
   signal_lost: boolean
   hr: number | null

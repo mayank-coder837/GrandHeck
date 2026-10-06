@@ -156,6 +156,13 @@ ACTIVITY_SMOOTHING_MIN = 3          # DESIGN: median of the last N readings, so 
 REST_MIN_DURATION_MIN = 10          # DESIGN: a rest bout must last this long to reset
                                     # "time since rest". NIOSH work/rest regimens use
                                     # >=15 min breaks per hour (see [NIOSH] Ch. 8).
+WORKLOAD_WINDOW_MIN = 10            # DESIGN: workload is inferred from the median activity
+                                    # of the last N working minutes (profile used until then)
+ACTIVITY_WORKLOAD_BANDS = [         # DESIGN: activity index upper bound -> workload class.
+    (0.45, "light"),                # TODO(verify): calibrate against ISO 8996 metabolic
+    (0.68, "moderate"),             # classes for the actual wearable before field use.
+    (1.01, "heavy"),
+]
 DROPOUT_TIMEOUT_MIN = 3             # DESIGN: no vitals for this long -> SIGNAL LOST
 SOLAR_CARRY_FORWARD_MAX_MIN = 30    # DESIGN: if the pyranometer drops out, reuse the last
                                     # good solar reading this long (flagged in the UI)
@@ -174,9 +181,9 @@ FORECASTER_VERSION = "v2"           # DESIGN: "v1" = trend extrapolation only;
                                     # "v2" = ridge model on ECTemp + environment + profile
                                     # (pipeline/model.py), falls back to v1 if no model file.
 V2_RIDGE_ALPHA = 10.0               # DESIGN: ridge regularisation strength
-V2_RISK_Z = 1.0                     # DESIGN: v2 warns on risk, not on the average forecast:
+V2_RISK_Z = 0.5                     # DESIGN: v2 warns on risk, not on the average forecast:
                                     # crossing = predicted core + Z x (validation error at
-                                    # that horizon) >= limit. Z = 1 ~ a 1-in-6 chance.
+                                    # that horizon) >= limit. Z = 0.5 ~ a 3-in-10 chance.
                                     # Tuned on validation seeds only (eval/evaluate.py --tuning).
 
 # Alert explanations. DESIGN: these only rank and phrase the "why" factors

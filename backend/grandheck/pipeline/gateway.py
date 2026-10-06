@@ -85,7 +85,8 @@ class WorkerState:
         self.filter = ECTempFilter()
         self.core_limit_c = (C.CORE_LIMIT_ACCLIMATIZED_C if profile.acclimatized
                              else C.CORE_LIMIT_UNACCLIMATIZED_C)
-        self.wbgt_limit_c = limits.wbgt_limit_c(profile.workload, profile.acclimatized)
+        self.workload = profile.workload     # current, inferred from activity once data arrive
+        self._working_activity: deque = deque(maxlen=C.WORKLOAD_WINDOW_MIN)
         self.hr0 = profile.resting_hr
         self._early_hr: list[float] = []
         self.tc0 = C.ECT_CT0_C
@@ -107,6 +108,20 @@ class WorkerState:
         self.forecast: Forecast | None = None
         self.reasons: list[str] = []
         self.history: deque = deque(maxlen=C.HISTORY_MINUTES)
+
+    @property
+    def wbgt_limit_c(self) -> float:
+        return limits.wbgt_limit_c(self.workload, self.p.acclimatized)
+
+    def _infer_workload(self, activity: float | None) -> None:
+        """Workload from the accelerometer, so a worker switched to heavy work is noticed."""
+        if activity is None or self.resting:
+            return
+        self._working_activity.append(activity)
+        if len(self._working_activity) < C.WORKLOAD_WINDOW_MIN:
+            return
+        level = float(np.median(self._working_activity))
+        self.workload = next(name for upper, name in C.ACTIVITY_WORKLOAD_BANDS if level < upper)
 
     @property
     def older(self) -> bool:
@@ -145,6 +160,7 @@ class WorkerState:
             self.activity = vitals.activity
             self.last_seen_minute = minute
             self._track_rest(vitals.activity)
+            self._infer_workload(vitals.activity)
             working = not self.resting
             if working and wbgt_c is not None and wbgt_c > self.wbgt_limit_c:
                 self.exposure_total_min += 1
@@ -247,7 +263,7 @@ class Gateway:
                 wbgt_excess=None if self.site.wbgt_c is None else self.site.wbgt_c - ws.wbgt_limit_c,
                 wbgt_trend_c_per_h=site["wbgt_trend_c_per_h"], working=not ws.resting,
                 minutes_since_rest=ws.minutes_since_rest, acclimatized=ws.p.acclimatized,
-                workload=ws.p.workload, older=ws.older, data_minutes=ws.observed_minutes)
+                workload=ws.workload, older=ws.older, data_minutes=ws.observed_minutes)
             if self.model is not None and not fc.stale and not ws.signal_lost:
                 path = self.model.predict_path(ws.features, ws.filter.ct)
                 risk = self.model.risk_path(path, self.risk_z)
@@ -266,7 +282,7 @@ class Gateway:
                 hr_rise_bpm_15min=ws.hr_rise_15min(), psi=ws.psi, wbgt_c=self.site.wbgt_c,
                 wbgt_limit_c=ws.wbgt_limit_c, wbgt_trend_c_per_h=site["wbgt_trend_c_per_h"],
                 minutes_since_rest=ws.minutes_since_rest, acclimatized=ws.p.acclimatized,
-                older_worker=ws.older, workload=ws.p.workload))
+                older_worker=ws.older, workload=ws.workload))
             for ev in events:
                 msg = self._alert_message(ws, ev, now)
                 self.bus.publish(alert_topic(self.site_id, wid), msg.model_dump(mode="json", by_alias=True))
@@ -299,6 +315,7 @@ class Gateway:
             "profile": ws.p.model_dump() | {"age_band": ws.p.age_band},
             "core_limit_c": ws.core_limit_c,
             "wbgt_limit_c": round(ws.wbgt_limit_c, 1),
+            "workload_observed": ws.workload,
             "level": ws.alerts.level_name,
             "signal_lost": ws.signal_lost,
             "hr": ws.hr,

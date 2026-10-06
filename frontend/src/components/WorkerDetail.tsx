@@ -79,7 +79,8 @@ export function WorkerDetail({ worker, ticks, utcOffsetH, onClose }: {
         <div>
           <h2>{p.name} <span className="muted">· {p.role}</span></h2>
           <div className="muted">
-            {p.acclimatized ? 'Acclimatized' : 'Not acclimatized'} · {p.workload} work · age {p.age} ·
+            {p.acclimatized ? 'Acclimatized' : 'Not acclimatized'} · {worker.workload_observed} work
+            {worker.workload_observed !== p.workload && ` (assigned ${p.workload})`} · age {p.age} ·
             core limit {worker.core_limit_c.toFixed(1)} °C · WBGT limit {worker.wbgt_limit_c.toFixed(1)} °C
             {' '}({p.acclimatized ? 'NIOSH REL' : 'NIOSH RAL'})
           </div>

@@ -36,7 +36,10 @@ export function WorkerCard({ w, horizon, selected, onSelect }: {
 
       <div className="tags">
         <span className={`tag ${p.acclimatized ? '' : 'tag-risk'}`}>{p.acclimatized ? 'Acclimatized' : 'Not acclimatized'}</span>
-        <span className={`tag ${p.workload === 'heavy' ? 'tag-risk' : ''}`}>{p.workload}</span>
+        <span className={`tag ${w.workload_observed === 'heavy' ? 'tag-risk' : ''}`}
+          title={w.workload_observed !== p.workload ? `Assigned ${p.workload}; accelerometer shows ${w.workload_observed}` : 'Workload'}>
+          {w.workload_observed !== p.workload ? `now ${w.workload_observed}` : p.workload}
+        </span>
         <span className={`tag ${p.age_band === '45+' ? 'tag-risk' : ''}`}>age {p.age_band}</span>
         {w.resting && !w.signal_lost && <span className="tag tag-rest">resting</span>}
       </div>
